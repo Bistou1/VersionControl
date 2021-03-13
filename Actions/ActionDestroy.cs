@@ -16,7 +16,8 @@ namespace SurvivalEngine
         public override void DoAction(PlayerCharacter character, Selectable select)
         {
             select.GetDestructible().KillIn(0.5f);
-            character.TriggerAction(animation, select.transform.position, 0.5f);
+            character.TriggerAnim(animation, select.transform.position);
+            character.TriggerAction(0.5f);
         }
 
         public override bool CanDoAction(PlayerCharacter character, Selectable select)

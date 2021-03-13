@@ -19,7 +19,8 @@ namespace SurvivalEngine
         public override void DoAction(PlayerCharacter character, Selectable select)
         {
             string animation = PlayerCharacterAnim.Get() ? PlayerCharacterAnim.Get().take_anim : "";
-            character.TriggerAction(animation, select.transform.position, 0.5f, () =>
+            character.TriggerAnim(animation, select.transform.position);
+            character.TriggerAction(0.5f, () =>
             {
                 character.Attributes.AddAttribute(AttributeType.Health, drink_hp);
                 character.Attributes.AddAttribute(AttributeType.Hunger, drink_hunger);

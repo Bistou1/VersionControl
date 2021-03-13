@@ -94,6 +94,7 @@ namespace SurvivalEngine
         
         public int day = 0;
         public float day_time = 0f; // 0 = midnight, 24 = end of day
+        public float play_time = 0f; //total play time in actual seconds
 
         public float master_volume = 1f;
         public float music_volume = 1f;
@@ -392,7 +393,7 @@ namespace SurvivalEngine
         public void ShowObject(string uid)
         {
             if (hidden_objects.ContainsKey(uid))
-                hidden_objects.Remove(uid);
+                hidden_objects[uid] = 0;
         }
 
         public bool IsObjectHidden(string uid)
@@ -400,6 +401,11 @@ namespace SurvivalEngine
             if (hidden_objects.ContainsKey(uid))
                 return hidden_objects[uid] > 0;
             return false;
+        }
+
+        public bool HasHiddenState(string uid)
+        {
+            return hidden_objects.ContainsKey(uid);
         }
 
         // ---- Unique Ids (Custom data) ----
@@ -515,6 +521,11 @@ namespace SurvivalEngine
         public bool IsWorldGenerated()
         {
             return world_seed != 0;
+        }
+
+        public bool IsNewGame()
+        {
+            return play_time < 0.0001f;
         }
 
         //--- Save / load -----

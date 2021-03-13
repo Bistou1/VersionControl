@@ -36,6 +36,9 @@ namespace SurvivalEngine
         {
             if (HasUID() && PlayerData.Get().IsObjectHidden(unique_id))
                 gameObject.SetActive(false);
+
+            if (!HasUID() && Time.time < 0.1f)
+                Debug.LogWarning("UID is empty on " + gameObject.name + ". Make sure to generate UIDs with SurvivalEngine->Generate UID");
         }
 
         public void Hide()

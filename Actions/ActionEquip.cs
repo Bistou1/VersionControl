@@ -19,9 +19,10 @@ namespace SurvivalEngine
 
             if (item != null && item.type == ItemType.Equipment)
             {
-                if (inventory.type == InventoryType.Equipment)
+                if (inventory.type == InventoryType.Equipment && slot is EquipSlotUI)
                 {
-                    character.Inventory.UnequipItem(slot.GetEquipSlot());
+                    EquipSlotUI eslot = (EquipSlotUI) slot;
+                    character.Inventory.UnequipItem(eslot.equip_slot);
                 }
                 else
                 {

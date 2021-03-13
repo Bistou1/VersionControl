@@ -19,7 +19,9 @@ namespace SurvivalEngine
         {
             string uid = select.GetUID();
             if (!string.IsNullOrEmpty(uid))
-                StoragePanel.Get().ShowStorage(character, uid, max_storage);
+                StoragePanel.Get(character.player_id).ShowStorage(character, uid, max_storage);
+            else
+                Debug.LogError("You must generate the UID to use the storage feature.");
         }
     }
 

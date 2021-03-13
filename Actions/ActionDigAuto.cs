@@ -19,7 +19,8 @@ namespace SurvivalEngine
             if (spot != null)
             {
                 string animation = PlayerCharacterAnim.Get() ? PlayerCharacterAnim.Get().dig_anim : "";
-                character.TriggerAction(animation, spot.transform.position, 1.5f, () =>
+                character.TriggerAnim(animation, spot.transform.position);
+                character.TriggerProgressAction(1.5f, () =>
                 {
                     spot.Dig();
 

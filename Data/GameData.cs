@@ -24,17 +24,6 @@ namespace SurvivalEngine
         [Header("Music")]
         public AudioClip[] music_playlist;
 
-        [Header("FX")]
-        public GameObject item_take_fx;
-        public GameObject item_select_fx;
-        public GameObject item_merge_fx;
-
-        [Header("Resources")]
-        public string items_folder = "Items";
-        public string constructions_folder = "Constructions";
-        public string plants_folder = "Plants";
-        public string characters_folder = "Characters";
-
         public static GameData Get()
         {
             return TheData.Get().data;

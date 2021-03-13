@@ -31,7 +31,8 @@ namespace SurvivalEngine
                 plant.AddWater(character);
 
                 string animation = PlayerCharacterAnim.Get() ? PlayerCharacterAnim.Get().water_anim : "";
-                character.TriggerAction(animation, plant.transform.position, 1f);
+                character.TriggerAnim(animation, plant.transform.position);
+                character.TriggerProgressAction(1f);
             }
         }
 

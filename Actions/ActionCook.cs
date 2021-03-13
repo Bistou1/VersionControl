@@ -12,13 +12,18 @@ namespace SurvivalEngine
     public class ActionCook : MAction
     {
         public ItemData cooked_item;
+        public float duration = 0.5f;
 
         //Merge action
         public override void DoAction(PlayerCharacter character, ItemSlot slot, Selectable select)
         {
-            InventoryData inventory = slot.GetInventory();
-            inventory.RemoveItemAt(slot.index, 1);
-            character.Inventory.GainItem(cooked_item, 1);
+            character.TriggerAnim("Craft", select.transform.position);
+            character.TriggerProgressAction(duration, () =>
+            {
+                InventoryData inventory = slot.GetInventory();
+                inventory.RemoveItemAt(slot.index, 1);
+                character.Inventory.GainItem(cooked_item, 1);
+            });
         }
 
     }

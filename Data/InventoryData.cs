@@ -292,14 +292,14 @@ namespace SurvivalEngine
 
         public void EquipItem(EquipSlot equip_slot, string item_id, float durability, string uid)
         {
-            int eslot = ItemData.GetEquipIndex(equip_slot);
+            int eslot = (int)equip_slot;
             InventoryItemData idata = new InventoryItemData(item_id, 1, durability, uid);
             items[eslot] = idata;
         }
 
         public void UnequipItem(EquipSlot equip_slot)
         {
-            int eslot = ItemData.GetEquipIndex(equip_slot);
+            int eslot = (int)equip_slot;
             if (items.ContainsKey(eslot))
                 items.Remove(eslot);
         }
@@ -309,9 +309,39 @@ namespace SurvivalEngine
             return GetEquippedItem(equip_slot) != null;
         }
 
+        //Return first equipped weapon, in any slot
+        public InventoryItemData GetEquippedWeapon()
+        {
+            foreach (KeyValuePair<int, InventoryItemData> item in items)
+            {
+                ItemData idata = ItemData.Get(item.Value.item_id);
+                if (idata && idata.IsWeapon())
+                    return item.Value;
+            }
+            return null;
+        }
+
+        //Return first equipped weapon slot
+        public EquipSlot GetEquippedWeaponSlot()
+        {
+            foreach (KeyValuePair<int, InventoryItemData> item in items)
+            {
+                ItemData idata = ItemData.Get(item.Value.item_id);
+                if (idata && idata.IsWeapon())
+                    return (EquipSlot) item.Key;
+            }
+            return EquipSlot.None;
+        }
+
+        public ItemData GetEquippedWeaponData()
+        {
+            InventoryItemData idata = GetEquippedWeapon();
+            return idata?.GetItem();
+        }
+
         public InventoryItemData GetEquippedItem(EquipSlot equip_slot)
         {
-            int slot = ItemData.GetEquipIndex(equip_slot);
+            int slot = (int)equip_slot;
             if (items.ContainsKey(slot))
                 return items[slot];
             return null;

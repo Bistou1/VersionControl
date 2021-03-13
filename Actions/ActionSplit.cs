@@ -19,7 +19,8 @@ namespace SurvivalEngine
             InventoryItemData item_data = inventory.GetItem(slot.index);
             inventory.RemoveItemAt(slot.index, half);
 
-            InventoryData ninventory = character.Inventory.GetValidInventory(item, half);
+            bool can_take = inventory.CanTakeItem(item.id, half);
+            InventoryData ninventory = can_take ? inventory : character.Inventory.GetValidInventory(item, half); //If cant take, find a valid one
             int new_slot = ninventory.GetFirstEmptySlot();
             ninventory.AddItemAt(item.id, new_slot, half, item_data.durability, UniqueID.GenerateUniqueID());
         }

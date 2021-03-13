@@ -29,7 +29,7 @@ namespace SurvivalEngine
             if (destroy_on_learn)
                 inventory.RemoveItemAt(slot.index, 1);
 
-            CraftSubPanel.Get().RefreshCraftPanel();
+            CraftSubPanel.Get(character.player_id)?.RefreshCraftPanel();
         }
 
         public override bool CanDoAction(PlayerCharacter character, ItemSlot slot)

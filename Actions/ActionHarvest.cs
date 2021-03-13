@@ -17,7 +17,8 @@ namespace SurvivalEngine
             if (plant != null)
             {
                 string animation = PlayerCharacterAnim.Get() ? PlayerCharacterAnim.Get().take_anim : "";
-                character.TriggerAction(animation, plant.transform.position, 0.5f, () =>
+                character.TriggerAnim(animation, plant.transform.position);
+                character.TriggerAction(0.5f, () =>
                 {
                     plant.Harvest(character);
                 });
