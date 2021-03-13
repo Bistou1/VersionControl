@@ -85,7 +85,7 @@ namespace SurvivalEngine
                 return;
             }
 
-            PlayerControls controls = PlayerControls.Get();
+            PlayerControls controls = PlayerControls.GetFirst();
             PlayerControlsMouse mouse = PlayerControlsMouse.Get();
 
             //Rotate
@@ -148,7 +148,7 @@ namespace SurvivalEngine
 
         private void UpdateFreeRotation()
         {
-            PlayerControls controls = PlayerControls.Get();
+            PlayerControls controls = PlayerControls.GetFirst();
             PlayerControlsMouse mouse = PlayerControlsMouse.Get();
             Vector2 mouse_delta = Vector2.zero;
             if(IsLocked())
@@ -254,7 +254,7 @@ namespace SurvivalEngine
 
         public bool IsFreeRotation()
         {
-            return freelook_mode != FreelookMode.Never && (IsLocked() || PlayerControls.Get().IsGamePad());
+            return freelook_mode != FreelookMode.Never && (IsLocked() || PlayerControls.GetFirst().IsGamePad());
         }
 
         public Camera GetCam()

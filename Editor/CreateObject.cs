@@ -178,7 +178,7 @@ namespace SurvivalEngine.EditorTool
                     if (data.equip_slot == EquipSlot.Hand)
                     {
                         data.damage = 10;
-                        data.weapon = true;
+                        data.weapon_type = WeaponType.WeaponMelee;
                     }
                     else
                     {

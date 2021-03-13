@@ -13,18 +13,15 @@ namespace SurvivalEngine
 
     public class TheGame : MonoBehaviour
     {
-        [Header("Loader")]
-        public GameObject ui_canvas;
-        public GameObject ui_canvas_mobile;
-        public GameObject audio_manager;
-        public GameObject action_selector;
+        //non-static UnityActions only work in a game scene that uses TheGame.cs
+        public UnityAction<string> beforeSave; //Right after calling Save(), before writing the file on disk
+        public UnityAction<bool> onPause; //When pausing/unpausing the game
+        public UnityAction onStartNewGame; //After creating a new game and after the game scene has been loaded, only first time if its a new game.
 
-        public UnityAction<string> beforeSave;
-        public UnityAction<bool> onPause;
-
-        public static UnityAction afterLoad;
-        public static UnityAction afterNewGame;
-        public static UnityAction<string> beforeChangeScene;
+        //static UnityActions work in any scene (including Menu scenes that don't have TheGame.cs)
+        public static UnityAction afterLoad; //Right after calling Load(), after loading the PlayerData but before changing scene
+        public static UnityAction afterNewGame; //Right after calling NewGame(), after creating the PlayerData but before changing scene
+        public static UnityAction<string> beforeChangeScene; //Right before changing scene (for any reason)
 
         private bool paused = false;
         private bool paused_by_player = false;
@@ -37,14 +34,6 @@ namespace SurvivalEngine
         {
             _instance = this;
             PlayerData.LoadLast();
-
-            //Load managers
-            if (!FindObjectOfType<TheUI>())
-                Instantiate(IsMobile() ? ui_canvas_mobile : ui_canvas);
-            if (!FindObjectOfType<TheAudio>())
-                Instantiate(audio_manager);
-            if (!FindObjectOfType<ActionSelector>())
-                Instantiate(action_selector);
         }
 
         private void Start()
@@ -111,6 +100,12 @@ namespace SurvivalEngine
                 BlackPanel.Get().Show(true);
                 BlackPanel.Get().Hide();
             }
+
+            if (pdata.IsNewGame() && onStartNewGame != null)
+            {
+                pdata.play_time = 0.01f; //Initialize play time to 0.01f to make sure onStartNewGame never get called again
+                onStartNewGame.Invoke(); //New Game!
+            }
         }
 
         void Update()
@@ -139,6 +134,9 @@ namespace SurvivalEngine
                 pdata.day_time = 0f;
                 pdata.day++; //New day
             }
+
+            //Play time
+            pdata.play_time += Time.deltaTime;
 
             //Set music
             AudioClip[] music_playlist = GameData.Get().music_playlist;

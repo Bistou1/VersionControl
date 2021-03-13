@@ -14,6 +14,11 @@ namespace SurvivalEngine
         public GameObject icon_group;
         public SpriteRenderer icon;
         public Text title;
+        public float refresh_rate = 0.1f;
+
+        private ItemSlot current_slot = null;
+        private Selectable current_select = null;
+        private float timer = 0f;
 
         private static ItemSelectedFX _instance;
 
@@ -29,24 +34,35 @@ namespace SurvivalEngine
             transform.position = PlayerControlsMouse.Get().GetPointingPos();
             transform.rotation = Quaternion.LookRotation(TheCamera.Get().transform.forward, Vector3.up);
 
-            ItemSlot slot = ItemSlotPanel.GetSelectedSlotInAllPanels();
-
-            Selectable select = Selectable.GetNearestHover(transform.position);
             PlayerCharacter player = PlayerCharacter.GetFirst();
-            MAction maction = slot != null && slot.GetItem() != null ? slot.GetItem().FindMergeAction(select) : null;
-            title.enabled = maction != null && player != null && maction.CanDoAction(player, slot, select);
+            PlayerControls controls = PlayerControls.Get(player ? player.player_id : 0);
+
+            MAction maction = current_slot != null && current_slot.GetItem() != null ? current_slot.GetItem().FindMergeAction(current_select) : null;
+            title.enabled = maction != null && player != null && maction.CanDoAction(player, current_slot, current_select);
             title.text = maction != null ? maction.title : "";
 
-            bool active = slot != null && !PlayerControls.Get().IsGamePad();
+            bool active = current_slot != null && controls != null && !controls.IsGamePad();
             if (active != icon_group.activeSelf)
                 icon_group.SetActive(active);
 
-            if (slot != null && slot.GetItem())
+            if (current_slot != null && current_slot.GetItem())
             {
-                icon.sprite = slot.GetItem().icon;
+                icon.sprite = current_slot.GetItem().icon;
+            }
+
+            timer += Time.deltaTime;
+            if (timer > refresh_rate)
+            {
+                timer = 0f;
+                SlowUpdate();
             }
         }
 
+        private void SlowUpdate()
+        {
+            current_slot = ItemSlotPanel.GetSelectedSlotInAllPanels();
+            current_select = Selectable.GetNearestHover(transform.position);
+        }
 
         public static ItemSelectedFX Get()
         {

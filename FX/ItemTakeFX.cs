@@ -64,9 +64,9 @@ namespace SurvivalEngine
 
         public static void DoTakeFX(Vector3 pos, ItemData item, InventoryType inventory, int target_slot)
         {
-            if (GameData.Get().item_take_fx != null)
+            if (AssetData.Get().item_take_fx != null)
             {
-                GameObject fx = Instantiate(GameData.Get().item_take_fx, pos, Quaternion.identity);
+                GameObject fx = Instantiate(AssetData.Get().item_take_fx, pos, Quaternion.identity);
                 fx.GetComponent<ItemTakeFX>().SetItem(item, inventory, target_slot);
             }
         }
