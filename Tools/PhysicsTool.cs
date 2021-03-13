@@ -11,7 +11,7 @@ namespace SurvivalEngine
     public class PhysicsTool
     {
         //Detect if object is grounded, the ground normal, and ground distance from root
-        public static bool DetectGround(Vector3 root, Vector3 center, float hdist, float radius, LayerMask ground_layer, out float ground_distance, out Vector3 ground_normal)
+        public static bool DetectGround(Transform root, Vector3 center, float hdist, float radius, LayerMask ground_layer, out float ground_distance, out Vector3 ground_normal)
         {
             Vector3 p1 = center;
             Vector3 p2 = center + Vector3.left * radius;
@@ -25,6 +25,11 @@ namespace SurvivalEngine
             bool f3 = Physics.Raycast(p3, Vector3.down, out h3, hdist, ground_layer.value, QueryTriggerInteraction.Ignore);
             bool f4 = Physics.Raycast(p4, Vector3.down, out h4, hdist, ground_layer.value, QueryTriggerInteraction.Ignore);
             bool f5 = Physics.Raycast(p5, Vector3.down, out h5, hdist, ground_layer.value, QueryTriggerInteraction.Ignore);
+            f1 = f1 && h1.collider.transform != root && !h1.collider.transform.IsChildOf(root);
+            f2 = f2 && h2.collider.transform != root && !h2.collider.transform.IsChildOf(root);
+            f3 = f3 && h3.collider.transform != root && !h3.collider.transform.IsChildOf(root);
+            f4 = f4 && h4.collider.transform != root && !h4.collider.transform.IsChildOf(root);
+            f5 = f5 && h5.collider.transform != root && !h5.collider.transform.IsChildOf(root);
 
             bool is_grounded = f1 || f2 || f3 || f4 || f5;
             ground_normal = Vector3.up;
@@ -43,7 +48,7 @@ namespace SurvivalEngine
                 if (f5) { hit_center += h5.point; nb++; }
                 if (fd) { hit_center += hd.point; nb++; }
                 hit_center = hit_center / nb;
-                ground_distance = (hit_center - root).y;
+                ground_distance = (hit_center - root.position).y;
             }
 
             //Find ground normal
@@ -61,11 +66,11 @@ namespace SurvivalEngine
                 ground_normal = normal.normalized;
             }
 
-            //Debug.DrawRay(p1, Vector3.down * hradius);
-            //Debug.DrawRay(p2, Vector3.down * hradius);
-            //Debug.DrawRay(p3, Vector3.down * hradius);
-            //Debug.DrawRay(p4, Vector3.down * hradius);
-            //Debug.DrawRay(p5, Vector3.down * hradius);
+            //Debug.DrawRay(p1, Vector3.down * hdist);
+            //Debug.DrawRay(p2, Vector3.down * hdist);
+            //Debug.DrawRay(p3, Vector3.down * hdist);
+            //Debug.DrawRay(p4, Vector3.down * hdist);
+            //Debug.DrawRay(p5, Vector3.down * hdist);
 
             return is_grounded;
         }

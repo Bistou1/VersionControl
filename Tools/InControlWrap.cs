@@ -17,6 +17,8 @@ namespace SurvivalEngine
     {
 #if IN_CONTROL
 
+        public int player_id = 0;
+
         public InputControlType action = InputControlType.Action1;
         public InputControlType attack = InputControlType.Action3;
         public InputControlType attack2 = InputControlType.RightBumper;
@@ -57,7 +59,7 @@ namespace SurvivalEngine
         {
             active_device = InputManager.ActiveDevice;
 
-            PlayerControls controls = PlayerControls.Get();
+            PlayerControls controls = PlayerControls.Get(player_id);
             controls.gamepad_linked = true;
 
             controls.gamepad_action = () => { return WasPressed(active_device, action); };
