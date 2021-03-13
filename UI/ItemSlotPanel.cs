@@ -1,0 +1,400 @@
+﻿using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Events;
+
+namespace SurvivalEngine
+{
+    /// <summary>
+    /// Generic parent UI panel that manages multiple item slots (Inventory/Equip/Storage, etc)
+    /// </summary>
+
+    public class ItemSlotPanel : UISlotPanel
+    {
+        public bool limit_one_item = false; //If true, only 1 item per slot
+
+        public UnityAction<ItemSlot> onSelectSlot;
+        public UnityAction<ItemSlot, ItemSlot> onMergeSlot;
+
+        protected PlayerCharacter current_player;
+        protected InventoryType inventory_type;
+        protected string inventory_uid;
+        protected int inventory_size = 99;
+
+        protected int selected_slot = -1;
+        protected int selected_right_slot = -1;
+
+        private static List<ItemSlotPanel> slot_panels = new List<ItemSlotPanel>();
+
+        protected override void Awake()
+        {
+            base.Awake();
+            slot_panels.Add(this);
+        }
+
+        private void OnDestroy()
+        {
+            slot_panels.Remove(this);
+        }
+
+        protected override void Start()
+        {
+            base.Start();
+
+            PlayerControlsMouse.Get().onRightClick += (Vector3) => { CancelSelection(); };
+
+            onClickSlot += OnClick;
+            onRightClickSlot += OnClickRight;
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            
+        }
+
+        protected override void RefreshPanel()
+        {
+            base.RefreshPanel();
+
+            InventoryData inventory = GetInventory();
+
+            if (inventory != null)
+            {
+                for (int i = 0; i < slots.Length; i++)
+                {
+                    InventoryItemData invdata = inventory.GetItem(i);
+                    ItemData idata = ItemData.Get(invdata?.item_id);
+                    ItemSlot slot = (ItemSlot) slots[i];
+                    if (invdata != null && idata != null)
+                    {
+                        slot.SetSlot(idata, invdata.quantity, selected_slot == i || selected_right_slot == i);
+                        slot.SetDurability(idata.GetDurabilityPercent(invdata.durability), ShouldShowDurability(idata, invdata.durability));
+                        slot.SetFilter(GetFilterLevel(idata, invdata.durability));
+                    }
+                    else if (i < inventory_size)
+                    {
+                        slot.SetSlot(null, 0, false);
+                    }
+                    else
+                    {
+                        slot.Hide();
+                    }
+                }
+            }
+        }
+
+        private bool ShouldShowDurability(ItemData idata, float durability)
+        {
+            int durabi = idata.GetDurabilityPercent(durability);
+            return idata.HasDurability() && durabi < 100 && (idata.durability_type != DurabilityType.Spoilage || durabi <= 50);
+        }
+
+        private int GetFilterLevel(ItemData idata, float durability)
+        {
+            int durabi = idata.GetDurabilityPercent(durability);
+            if (idata.HasDurability() && durabi <= 40 && idata.durability_type == DurabilityType.Spoilage)
+            {
+                return durabi <= 20 ? 2 : 1;
+            }
+            return 0;
+        }
+
+        private void OnClick(UISlot uislot)
+        {
+            if (uislot != null)
+            {
+                //Cancel right click and action selector
+                int previous_right_select = selected_right_slot;
+                ActionSelectorUI.Get().Hide();
+                selected_right_slot = -1;
+
+                int slot = uislot.index;
+                ItemSlot selslot = GetSelectedSlotInAllPanels();
+
+                //Cancel action selector
+                if (slot == previous_right_select)
+                {
+                    CancelSelection();
+                    return;
+                }
+
+                //Merge two slots
+                ItemSlot islot = (ItemSlot)uislot;
+                if (islot != null && selslot != null)
+                {
+                    MergeSlots(selslot, (ItemSlot)uislot);
+                    if (onMergeSlot != null)
+                        onMergeSlot.Invoke(selslot, islot);
+                }
+                //Select slot
+                else if (islot.GetCraftable() != null)
+                {
+                    CancelSelectionAll();
+                    selected_slot = slot;
+
+                    if (onSelectSlot != null)
+                        onSelectSlot.Invoke(islot);
+                }
+            }
+        }
+
+        private void OnClickRight(UISlot uislot)
+        {
+            //Cancel select
+            selected_slot = -1; 
+            selected_right_slot = -1;
+            ActionSelectorUI.Get().Hide();
+
+            //Show action selector
+            ItemSlot islot = (ItemSlot)uislot;
+            CraftData item = islot.GetCraftable();
+            if (item != null && item.GetItem() != null && item.GetItem().actions.Length > 0)
+            {
+                selected_right_slot = islot.index;
+                ActionSelectorUI.Get().Show(current_player, islot);
+            }
+        }
+
+        public void SetInventory(InventoryType type, string uid, int size)
+        {
+            inventory_type = type;
+            inventory_uid = uid;
+            inventory_size = size;
+
+            InventoryData idata = InventoryData.Get(type, uid);
+            if(idata != null)
+                idata.size = size;
+        }
+
+        public void SetPlayer(PlayerCharacter player)
+        {
+            current_player = player;
+        }
+
+        public void MergeSlots(ItemSlot selected_slot, ItemSlot clicked_slot)
+        {
+            if (selected_slot != null && clicked_slot != null && current_player != null)
+            {
+                ItemSlot slot1 = selected_slot;
+                ItemSlot slot2 = clicked_slot;
+                ItemData item1 = slot1.GetItem();
+                ItemData item2 = slot2.GetItem();
+                MAction action1 = item1 != null ? item1.FindMergeAction(item2) : null;
+                MAction action2 = item2 != null ? item2.FindMergeAction(item1) : null;
+
+                if (item1 != null && item2 != null)
+                {
+                    //Same slot, cancel select
+                    if (slot1 == slot2)
+                    {
+                        CancelSelection();
+                        return;
+                    }
+                    //Same item, combine stacks
+                    else if (item1 == item2 && !limit_one_item)
+                    {
+                        CombineItems(selected_slot, clicked_slot);
+                        return;
+                    }
+                    //Else, use merge action
+                    else if (action1 != null && action1.CanDoAction(current_player, slot1, slot2))
+                    {
+                        DoMergeAction(action1, slot1, slot2);
+                        return;
+                    }
+
+                    else if (action2 != null && action2.CanDoAction(current_player, slot2, slot1))
+                    {
+                        DoMergeAction(action2, slot2, slot1);
+                        return;
+                    }
+                }
+
+                if (item1 != item2)
+                {
+                    //Swap
+                    bool should_swap = !limit_one_item || slot1.GetInventory() == slot2.GetInventory();
+                    if (item2 == null && !should_swap)
+                    {
+                        SetOneItem(selected_slot, clicked_slot);
+                        return;
+                    }
+
+                    if (should_swap)
+                    {
+                        SwapItems(selected_slot, clicked_slot);
+                        return;
+                    }
+                }
+            }
+        }
+
+        private void DoMergeAction(MAction action, ItemSlot slot_action, ItemSlot slot_other)
+        {
+            if (slot_action == null || slot_other == null || current_player == null)
+                return;
+
+            action.DoAction(current_player, slot_action, slot_other);
+
+            CancelPlayerSelection();
+        }
+
+        public void SwapItems(ItemSlot slot1, ItemSlot slot2)
+        {
+            InventoryData inventory1 = slot1.GetInventory();
+            InventoryData inventory2 = slot2.GetInventory();
+
+            if (inventory1 != null && inventory2 != null && current_player != null)
+            {
+                if (inventory2.type == InventoryType.Equipment)
+                {
+                    current_player.Inventory.EquipItem(inventory1, slot1.index);
+                }
+                else if (inventory1.type == InventoryType.Equipment)
+                {
+                    current_player.Inventory.UnequipItemTo(inventory2, slot1.GetEquipSlot(), slot2.index);
+                }
+                else
+                {
+                    current_player.Inventory.SwapItems(inventory1, slot1.index, inventory2, slot2.index);
+                }
+
+                CancelPlayerSelection();
+            }
+        }
+
+        public void SetOneItem(ItemSlot slot_select, ItemSlot slot_target)
+        {
+            InventoryData inventory1 = slot_select.GetInventory();
+            InventoryData inventory2 = slot_target.GetInventory();
+            if (current_player != null && inventory1 != null && inventory2 != null)
+            {
+                InventoryItemData invdata = inventory1.GetItem(slot_select.index);
+                if (invdata != null && invdata.quantity > 0 && slot_target.GetItem() == null)
+                {
+                    string uid = invdata.quantity > 1 ? UniqueID.GenerateUniqueID() : invdata.uid;
+                    inventory1.RemoveItemAt(slot_select.index, 1);
+                    inventory2.AddItemAt(invdata.item_id, slot_target.index, 1, invdata.durability, uid);
+
+                    if (invdata.quantity <= 1)
+                    {
+                        CancelPlayerSelection();
+                    }
+                }
+            }
+        }
+
+        public void CombineItems(ItemSlot slot1, ItemSlot slot2)
+        {
+            InventoryData inventory1 = slot1.GetInventory();
+            InventoryData inventory2 = slot2.GetInventory();
+
+            if (current_player != null && inventory1 != null && inventory2 != null && inventory1.type != InventoryType.Equipment && inventory2.type != InventoryType.Equipment)
+            {
+                current_player.Inventory.CombineItems(inventory1, slot1.index, inventory2, slot2.index);
+                CancelPlayerSelection();
+            }
+        }
+
+        public void UseItem(ItemSlot slot, int quantity=1)
+        {
+            InventoryData inventory1 = slot.GetInventory();
+            if (current_player != null && inventory1 != null)
+                inventory1.RemoveItemAt(slot.index, quantity);
+        }
+
+        public void CancelSelection()
+        {
+            selected_slot = -1;
+            selected_right_slot = -1;
+        }
+
+        public void CancelPlayerSelection()
+        {
+            CancelSelection();
+            if (current_player != null)
+            {
+                PlayerUI player_ui = PlayerUI.Get(current_player.player_id);
+                if (player_ui != null)
+                    player_ui.CancelSelection();
+            }
+        }
+
+        public bool HasSlotSelected()
+        {
+            return selected_slot >= 0;
+        }
+
+        public int GetSelectedSlotIndex()
+        {
+            return selected_slot;
+        }
+
+        public ItemSlot GetSelectedSlot()
+        {
+            if (selected_slot >= 0 && selected_slot < slots.Length)
+                return (ItemSlot) slots[selected_slot];
+            return null;
+        }
+
+        public Vector3 GetSlotWorldPosition(int slot)
+        {
+            if (slot >= 0 && slot < slots.Length)
+            {
+                RectTransform slotRect = slots[slot].GetRect();
+                return slotRect.position;
+            }
+            return Vector3.zero;
+        }
+
+        public string GetInventoryUID()
+        {
+            return inventory_uid;
+        }
+
+        public InventoryData GetInventory()
+        {
+            return InventoryData.Get(inventory_type, inventory_uid);
+        }
+
+        public bool IsInventorySet()
+        {
+            return inventory_type != InventoryType.None;
+        }
+
+        public static void CancelSelectionAll()
+        {
+            foreach (ItemSlotPanel panel in slot_panels)
+                panel.CancelSelection();
+        }
+
+        public static ItemSlot GetSelectedSlotInAllPanels()
+        {
+            foreach (ItemSlotPanel panel in slot_panels)
+            {
+                ItemSlot slot = panel.GetSelectedSlot();
+                if (slot != null)
+                    return slot;
+            }
+            return null;
+        }
+
+        public static ItemSlotPanel Get(InventoryType type)
+        {
+            foreach (ItemSlotPanel panel in slot_panels)
+            {
+                if (panel.inventory_type == type)
+                    return panel;
+            }
+            return null;
+        }
+
+        public static new List<ItemSlotPanel> GetAll()
+        {
+            return slot_panels;
+        }
+    }
+
+}
