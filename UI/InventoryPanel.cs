@@ -14,12 +14,12 @@ namespace SurvivalEngine
     {
         private PlayerUI parent_ui;
 
-        private static InventoryPanel _instance;
+        private static List<InventoryPanel> panel_list = new List<InventoryPanel>();
 
         protected override void Awake()
         {
             base.Awake();
-            _instance = this;
+            panel_list.Add(this);
             parent_ui = GetComponentInParent<PlayerUI>();
 
             for (int i = 0; i < slots.Length; i++)
@@ -27,28 +27,28 @@ namespace SurvivalEngine
                 slots[i].onPressKey += OnPressShortcut;
             }
 
-            onSelectSlot += OnSelectSlot;
-            onMergeSlot += OnMergeSlot;
-
             Hide(true);
+        }
+
+        private void OnDestroy()
+        {
+            panel_list.Remove(this);
         }
 
         protected override void Start()
         {
             base.Start();
-
-            InitInventory();
         }
 
-        public void InitInventory()
+        public override void InitPanel()
         {
             if (!IsInventorySet())
             {
-                PlayerCharacter player = parent_ui.GetPlayer();
+                PlayerCharacter player = parent_ui ? parent_ui.GetPlayer() : PlayerCharacter.GetFirst();
                 if (player != null)
                 {
                     SetInventory(InventoryType.Inventory, player.InventoryData.uid, player.Inventory.inventory_size);
-                    SetPlayer(parent_ui.GetPlayer());
+                    SetPlayer(player);
                     Show(true);
                 }
             }
@@ -60,19 +60,20 @@ namespace SurvivalEngine
             KeyClickSlot(slot.index, false);
         }
 
-        private void OnSelectSlot(ItemSlot islot)
+        public static InventoryPanel Get(int player_id=0)
         {
-
+            foreach (InventoryPanel panel in panel_list)
+            {
+                PlayerCharacter player = panel.GetPlayer();
+                if (player != null && player.player_id == player_id)
+                    return panel;
+            }
+            return null;
         }
 
-        private void OnMergeSlot(ItemSlot clicked_slot, ItemSlot selected_slot)
+        public static new List<InventoryPanel> GetAll()
         {
-           
-        }
-
-        public static InventoryPanel Get()
-        {
-            return _instance;
+            return panel_list;
         }
     }
 

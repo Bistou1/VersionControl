@@ -73,6 +73,9 @@ namespace SurvivalEngine
         private bool is_fishing = false;
 
         private ActionSleep sleep_target = null;
+        private Coroutine action_routine = null;
+        private GameObject action_progress = null;
+        private bool can_cancel_action = false;
 
         private Vector3[] nav_paths = new Vector3[0];
         private int path_index = 0;
@@ -129,7 +132,7 @@ namespace SurvivalEngine
             if (IsDead())
                 return;
 
-            PlayerControls controls = PlayerControls.Get();
+            PlayerControls controls = PlayerControls.Get(player_id);
             PlayerControlsMouse mcontrols = PlayerControlsMouse.Get();
             Vector3 tmove = Vector3.zero;
 
@@ -184,6 +187,10 @@ namespace SurvivalEngine
                 }
                 tmove = cam_move * move_speed * character_attr.GetSpeedMult();
             }
+
+            //CancelAction
+            if (is_action && can_cancel_action && tmove.magnitude > 0.1f)
+                CancelAction();
 
             //Stop moving if doing action
             if (is_action)
@@ -259,7 +266,7 @@ namespace SurvivalEngine
             Data.position = transform.position;
 
             //Controls
-            PlayerControls controls = PlayerControls.Get();
+            PlayerControls controls = PlayerControls.Get(player_id);
             jump_timer -= Time.deltaTime;
 
             //Stop sleep
@@ -298,7 +305,7 @@ namespace SurvivalEngine
             if (controls_enabled && !is_action) {
 
                 //Check if panel is focused
-                KeyControlsUI ui_controls = KeyControlsUI.Get();
+                KeyControlsUI ui_controls = KeyControlsUI.Get(player_id);
                 bool panel_focus = controls.gamepad_controls && ui_controls != null && ui_controls.IsPanelFocus();
                 if (!panel_focus)
                 {
@@ -345,10 +352,9 @@ namespace SurvivalEngine
             float hradius = collide.height * scale.y * 0.5f + ground_detect_dist; //radius is half the height minus offset
             float radius = collide.radius * (scale.x + scale.y) * 0.5f;
             Vector3 center = GetColliderCenter();
-            Vector3 root = transform.position;
 
             float gdist; Vector3 gnormal;
-            is_grounded = PhysicsTool.DetectGround(root, center, hradius, radius, ground_layer, out gdist, out gnormal);
+            is_grounded = PhysicsTool.DetectGround(transform, center, hradius, radius, ground_layer, out gdist, out gnormal);
             ground_normal = gnormal;
 
             float slope_angle = Vector3.Angle(ground_normal, Vector3.up);
@@ -381,44 +387,66 @@ namespace SurvivalEngine
 
         //--- Generic Actions ----
 
-        //Call animation directly
-        public void TriggerAnim(string anim, float duration = 0f)
-        {
-            if (onTriggerAnim != null)
-                onTriggerAnim.Invoke(anim, duration);
-        }
-
-        //Just animate the character for X seconds, and prevent it from doing other things, then callback
-        public void TriggerAction(string animation, Vector3 face_at, float duration, UnityAction callback = null)
+        //Same as trigger action, but also show the progress circle
+        public void TriggerProgressAction(float duration, UnityAction callback = null)
         {
             if (!is_action)
             {
-                FaceTorward(face_at);
-                TriggerAnim(animation, duration);
-                StartCoroutine(RunActionRoutine(duration, callback));
+                if (AssetData.Get().action_progress != null && duration > 0.1f)
+                {
+                    action_progress = Instantiate(AssetData.Get().action_progress, transform);
+                    action_progress.GetComponent<ActionProgress>().duration = duration;
+                }
+
+                action_routine = StartCoroutine(RunActionRoutine(duration, callback));
+                can_cancel_action = true;
+                StopMove();
             }
         }
 
+        //Wait for X seconds for any generic action (player can't do other things during that time)
         public void TriggerAction(float duration, UnityAction callback = null)
         {
             if (!is_action)
             {
-                StartCoroutine(RunActionRoutine(duration, callback));
+                action_routine = StartCoroutine(RunActionRoutine(duration, callback));
+                can_cancel_action = false;
             }
         }
 
         private IEnumerator RunActionRoutine(float action_duration, UnityAction callback=null)
         {
             is_action = true;
+
             yield return new WaitForSeconds(action_duration);
+
             is_action = false;
             if (callback != null)
                 callback.Invoke();
         }
 
+        public void CancelAction()
+        {
+            if (action_routine != null)
+                StopCoroutine(action_routine);
+            if (action_progress != null)
+                Destroy(action_progress);
+            is_action = false;
+            is_fishing = false;
+        }
+
+        //Call animation directly
+        public void TriggerAnim(string anim, Vector3 face_at, float duration = 0f)
+        {
+            FaceTorward(face_at);
+            if (onTriggerAnim != null)
+                onTriggerAnim.Invoke(anim, duration);
+        }
+
         public void SetDoingAction(bool action)
         {
             is_action = action;
+            can_cancel_action = false;
         }
 
         //---- Special actions
@@ -457,7 +485,7 @@ namespace SurvivalEngine
 
                 TriggerAction(0.4f, () =>
                 {
-                    StartCoroutine(FishRoutine(source, quantity));
+                    action_routine = StartCoroutine(FishRoutine(source, quantity));
                 });
             }
         }
@@ -652,7 +680,6 @@ namespace SurvivalEngine
             if (!controls_enabled)
                 return;
 
-            PlayerUI.Get(player_id)?.CancelSelection();
         }
 
         private void OnMouseHold(Vector3 pos)
@@ -682,6 +709,9 @@ namespace SurvivalEngine
         {
             if (!controls_enabled)
                 return;
+
+            if (is_action && can_cancel_action)
+                CancelAction();
 
             //Cancel previous build
             if (character_craft.ClickedBuild())
@@ -717,6 +747,9 @@ namespace SurvivalEngine
                 OnClickFloor(pos);
                 return;
             }
+
+            if (is_action && can_cancel_action)
+                CancelAction();
 
             selectable.Select();
 
@@ -800,7 +833,7 @@ namespace SurvivalEngine
         public bool IsMoving()
         {
             Vector3 moveXZ = new Vector3(move.x, 0f, move.z);
-            return moveXZ.magnitude > move_speed * character_attr.GetSpeedMult() * 0.25f;
+            return moveXZ.magnitude > move_speed * character_attr.GetSpeedMult() * 0.1f;
         }
 
         public Vector3 GetMove()

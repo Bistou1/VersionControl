@@ -79,33 +79,34 @@ namespace SurvivalEngine {
         {
             base.Update();
 
-            if (!PlayerControls.Get().IsGamePad())
+            if (!PlayerControls.IsAnyGamePad())
                 return;
 
             if (is_leader)
             {
                 if (IsVisible())
                 {
-                    PlayerControls controls = PlayerControls.Get();
-
-                    if (controls.IsMenuPressUp())
+                    foreach (PlayerControls controls in PlayerControls.GetAll())
                     {
-                        selection--;
-                        selection = Mathf.Clamp(selection, 0, group_list.Count - 1);
-                    }
-
-                    if (controls.IsMenuPressDown())
-                    {
-                        selection++;
-                        selection = Mathf.Clamp(selection, 0, group_list.Count - 1);
-                    }
-
-                    if (controls.IsPressMenuAccept())
-                    {
-                        if (selection >= 0 && selection < group_list.Count)
+                        if (controls.IsMenuPressUp())
                         {
-                            MenuButton button = group_list[selection];
-                            button.Click();
+                            selection--;
+                            selection = Mathf.Clamp(selection, 0, group_list.Count - 1);
+                        }
+
+                        if (controls.IsMenuPressDown())
+                        {
+                            selection++;
+                            selection = Mathf.Clamp(selection, 0, group_list.Count - 1);
+                        }
+
+                        if (controls.IsPressMenuAccept())
+                        {
+                            if (selection >= 0 && selection < group_list.Count)
+                            {
+                                MenuButton button = group_list[selection];
+                                button.Click();
+                            }
                         }
                     }
 

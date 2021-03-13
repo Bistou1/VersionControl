@@ -14,54 +14,85 @@ namespace SurvivalEngine
     {
         private PlayerUI parent_ui;
 
-        private static EquipPanel _instance;
+        private static List<EquipPanel> panel_list = new List<EquipPanel>();
 
         protected override void Awake()
         {
             base.Awake();
-            _instance = this;
+            panel_list.Add(this);
             parent_ui = GetComponentInParent<PlayerUI>();
 
-            onSelectSlot += OnSelectSlot;
-            onMergeSlot += OnMergeSlot;
-
             Hide(true);
+        }
+
+        private void OnDestroy()
+        {
+            panel_list.Remove(this);
         }
 
         protected override void Start()
         {
             base.Start();
 
-            InitInventory();
         }
 
-        public void InitInventory()
+        public override void InitPanel()
         {
             if (!IsInventorySet())
             {
-                PlayerCharacter player = parent_ui.GetPlayer();
+                PlayerCharacter player = parent_ui ? parent_ui.GetPlayer() : PlayerCharacter.GetFirst();
                 if (player != null)
                 {
                     SetInventory(InventoryType.Equipment, player.EquipData.uid, 99); //Size not important for equip inventory
-                    SetPlayer(parent_ui.GetPlayer());
+                    SetPlayer(player);
                     Show(true);
                 }
             }
         }
 
-        private void OnSelectSlot(ItemSlot islot)
+        protected override void RefreshPanel()
         {
+            InventoryData inventory = GetInventory();
 
+            if (inventory != null)
+            {
+                for (int i = 0; i < slots.Length; i++)
+                {
+                    EquipSlotUI slot = (EquipSlotUI)slots[i];
+                    if (slot != null)
+                    {
+                        InventoryItemData invdata = inventory.GetItem((int)slot.equip_slot);
+                        ItemData idata = ItemData.Get(invdata?.item_id);
+
+                        if (invdata != null && idata != null)
+                        {
+                            slot.SetSlot(idata, invdata.quantity, selected_slot == slot.index || selected_right_slot == slot.index);
+                            slot.SetDurability(idata.GetDurabilityPercent(invdata.durability), ShouldShowDurability(idata, invdata.durability));
+                            slot.SetFilter(GetFilterLevel(idata, invdata.durability));
+                        }
+                        else
+                        {
+                            slot.SetSlot(null, 0, false);
+                        }
+                    }
+                }
+            }
         }
 
-        private void OnMergeSlot(ItemSlot clicked_slot, ItemSlot selected_slot)
+        public static EquipPanel Get(int player_id=0)
         {
-           
+            foreach (EquipPanel panel in panel_list)
+            {
+                PlayerCharacter player = panel.GetPlayer();
+                if (player != null && player.player_id == player_id)
+                    return panel;
+            }
+            return null;
         }
 
-        public static EquipPanel Get()
+        public static new List<EquipPanel> GetAll()
         {
-            return _instance;
+            return panel_list;
         }
     }
 

@@ -13,19 +13,25 @@ namespace SurvivalEngine
     {
         private Animator animator;
 
-        private PlayerCharacter character;
+        private PlayerUI parent_ui;
         private ItemSlot slot;
 
-        private static ActionSelectorUI _instance;
+        private static List<ActionSelectorUI> selector_list = new List<ActionSelectorUI>();
 
         protected override void Awake()
         {
             base.Awake();
 
-            _instance = this;
+            selector_list.Add(this);
             animator = GetComponent<Animator>();
+            parent_ui = GetComponentInParent<PlayerUI>();
             gameObject.SetActive(false);
 
+        }
+
+        private void OnDestroy()
+        {
+            selector_list.Remove(this);
         }
 
         protected override void Start()
@@ -40,6 +46,8 @@ namespace SurvivalEngine
 
         private void RefreshSelector()
         {
+            PlayerCharacter character = GetPlayer();
+
             foreach (ActionSelectorButton button in slots)
                 button.Hide();
 
@@ -58,14 +66,14 @@ namespace SurvivalEngine
             }
         }
 
-        public void Show(PlayerCharacter character, ItemSlot slot)
+        public void Show(ItemSlot slot)
         {
+            PlayerCharacter character = GetPlayer();
             if (slot != null && character != null)
             {
-                if (!IsVisible() || this.slot != slot || this.character != character)
+                if (!IsVisible() || this.slot != slot)
                 {
                     this.slot = slot;
-                    this.character = character;
                     RefreshSelector();
                     //animator.SetTrigger("Show");
                     transform.position = slot.transform.position;
@@ -83,7 +91,6 @@ namespace SurvivalEngine
             if (IsVisible())
             {
                 base.Hide(instant);
-                character = null;
                 animator.SetTrigger("Hide");
             }
         }
@@ -98,16 +105,16 @@ namespace SurvivalEngine
         {
             if (IsVisible())
             {
+                PlayerCharacter character = GetPlayer();
                 if (action != null && slot != null && character != null)
                 {
                     ItemSlot aslot = slot;
-                    PlayerCharacter acharacter = character;
 
                     PlayerUI.Get(character.player_id)?.CancelSelection();
                     Hide();
 
-                    if (action.CanDoAction(acharacter, aslot))
-                        action.DoAction(acharacter, aslot);
+                    if (action.CanDoAction(character, aslot))
+                        action.DoAction(character, aslot);
 
                     
                 }
@@ -119,9 +126,25 @@ namespace SurvivalEngine
             Hide();
         }
 
-        public static ActionSelectorUI Get()
+        public PlayerCharacter GetPlayer()
         {
-            return _instance;
+            return parent_ui ? parent_ui.GetPlayer() : PlayerCharacter.GetFirst();
+        }
+
+        public static ActionSelectorUI Get(int player_id=0)
+        {
+            foreach (ActionSelectorUI panel in selector_list)
+            {
+                PlayerCharacter player = panel.GetPlayer();
+                if (player != null && player.player_id == player_id)
+                    return panel;
+            }
+            return null;
+        }
+
+        public static new List<ActionSelectorUI> GetAll()
+        {
+            return selector_list;
         }
     }
 

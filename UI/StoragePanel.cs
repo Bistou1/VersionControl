@@ -11,17 +11,20 @@ namespace SurvivalEngine
 
     public class StoragePanel : ItemSlotPanel
     {
-        private PlayerCharacter player;
-
-        private static StoragePanel _instance;
+        private static List<StoragePanel> panel_list = new List<StoragePanel>();
 
         protected override void Awake()
         {
             base.Awake();
-            _instance = this;
+            panel_list.Add(this);
 
             onSelectSlot += OnSelectSlot;
             onMergeSlot += OnMergeSlot;
+        }
+
+        private void OnDestroy()
+        {
+            panel_list.Remove(this);
         }
 
         protected override void RefreshPanel()
@@ -30,6 +33,7 @@ namespace SurvivalEngine
 
             //Hide if too far
             Selectable select = Selectable.GetByUID(inventory_uid);
+            PlayerCharacter player = GetPlayer();
             if (IsVisible() && player != null && select != null)
             {
                 float dist = (select.transform.position - player.transform.position).magnitude;
@@ -44,7 +48,6 @@ namespace SurvivalEngine
         {
             if (!string.IsNullOrEmpty(uid))
             {
-                this.player = player;
                 SetInventory(InventoryType.Storage, uid, max);
                 SetPlayer(player);
                 RefreshPanel();
@@ -74,9 +77,30 @@ namespace SurvivalEngine
             return inventory_uid;
         }
 
-        public static StoragePanel Get()
+        public static StoragePanel Get(int player_id=0)
         {
-            return _instance;
+            foreach (StoragePanel panel in panel_list)
+            {
+                PlayerCharacter player = panel.GetPlayer();
+                if (player != null && player.player_id == player_id)
+                    return panel;
+            }
+            return null;
+        }
+
+        public static bool IsAnyVisible()
+        {
+            foreach (StoragePanel panel in panel_list)
+            {
+                if (panel.IsVisible())
+                    return true;
+            }
+            return false;
+        }
+
+        public static new List<StoragePanel> GetAll()
+        {
+            return panel_list;
         }
     }
 

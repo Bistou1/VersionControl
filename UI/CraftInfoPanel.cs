@@ -24,16 +24,21 @@ namespace SurvivalEngine
 
         private float update_timer = 0f;
 
-        private static CraftInfoPanel _instance;
+        private static List<CraftInfoPanel> panel_list = new List<CraftInfoPanel>();
 
         protected override void Awake()
         {
             base.Awake();
-            _instance = this;
+            panel_list.Add(this);
             parent_ui = GetComponentInParent<PlayerUI>();
 
             if(parent_ui == null)
                 Debug.LogError("Warning: Missing PlayerUI script as parent of " + gameObject.name);
+        }
+
+        private void OnDestroy()
+        {
+            panel_list.Remove(this);
         }
 
         protected override void Update()
@@ -157,9 +162,31 @@ namespace SurvivalEngine
             return parent_ui;
         }
 
-        public static CraftInfoPanel Get()
+        public PlayerCharacter GetPlayer()
         {
-            return _instance;
+            return parent_ui ? parent_ui.GetPlayer() : PlayerCharacter.GetFirst();
+        }
+
+        public int GetPlayerID()
+        {
+            PlayerCharacter player = GetPlayer();
+            return player != null ? player.player_id : 0;
+        }
+
+        public static CraftInfoPanel Get(int player_id=0)
+        {
+            foreach (CraftInfoPanel panel in panel_list)
+            {
+                PlayerCharacter player = panel.GetPlayer();
+                if (player != null && player.player_id == player_id)
+                    return panel;
+            }
+            return null;
+        }
+
+        public static List<CraftInfoPanel> GetAll()
+        {
+            return panel_list;
         }
     }
 

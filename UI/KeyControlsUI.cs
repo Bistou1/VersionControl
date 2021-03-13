@@ -10,6 +10,8 @@ namespace SurvivalEngine
 
     public class KeyControlsUI : MonoBehaviour
     {
+        public int player_id;
+
         public UISlotPanel default_top;
         public UISlotPanel default_down;
         public UISlotPanel default_left;
@@ -19,16 +21,21 @@ namespace SurvivalEngine
         private UISlotPanel prev_select_panel = null;
         private UISlot prev_slot = null;
 
-        private static KeyControlsUI _instance;
+        private static List<KeyControlsUI> controls_ui_list = new List<KeyControlsUI>();
 
         void Awake()
         {
-            _instance = this;
+            controls_ui_list.Add(this);
+        }
+
+        private void OnDestroy()
+        {
+            controls_ui_list.Remove(this);
         }
 
         void Update()
         {
-            PlayerControls controls = PlayerControls.Get();
+            PlayerControls controls = PlayerControls.Get(player_id);
 
             if (!controls.IsGamePad())
                 return;
@@ -42,45 +49,54 @@ namespace SurvivalEngine
             else if (controls.IsUIPressDown())
                 Navigate(Vector2.down);
 
-            if (!IsCraftPanelFocus() && CraftPanel.Get().IsVisible())
+            ActionSelector selector = ActionSelector.Get(player_id);
+            ActionSelectorUI selector_ui = ActionSelectorUI.Get(player_id);
+            CraftPanel craft_panel = CraftPanel.Get(player_id);
+            CraftSubPanel craftsub_panel = CraftSubPanel.Get(player_id);
+
+            if (!IsCraftPanelFocus() && craft_panel != null && craft_panel.IsVisible())
             {
-                selected_panel = CraftPanel.Get();
-                CraftInfoPanel.Get().Hide();
+                selected_panel = craft_panel;
+                CraftInfoPanel.Get(player_id)?.Hide();
             }
 
-            if (selected_panel == CraftPanel.Get() && CraftPanel.Get().IsVisible())
+            if (selected_panel == craft_panel && craft_panel != null && craft_panel.IsVisible() && craftsub_panel != null)
             {
                 selected_panel.selection_index = Mathf.Clamp(selected_panel.selection_index, 0, selected_panel.CountActiveSlots() - 1);
 
                 UISlot slot = selected_panel.GetSelectSlot();
-                if (prev_slot != slot || !CraftSubPanel.Get().IsVisible())
+                if (prev_slot != slot || !craftsub_panel.IsVisible())
                 {
-                    CraftPanel.Get().KeyClick();
-                    CraftSubPanel.Get().selection_index = 0;
+                    craft_panel.KeyClick();
+                    craftsub_panel.selection_index = 0;
                 }
             }
 
-            else if (selected_panel == CraftSubPanel.Get() && CraftSubPanel.Get().IsVisible())
+            else if (selected_panel == craftsub_panel && craftsub_panel != null && craftsub_panel.IsVisible())
             {
                 selected_panel.selection_index = Mathf.Clamp(selected_panel.selection_index, 0, selected_panel.CountActiveSlots() - 1);
 
                 UISlot slot = selected_panel.GetSelectSlot();
-                if (prev_slot != slot || !CraftInfoPanel.Get().IsVisible())
+                CraftInfoPanel info_panel = CraftInfoPanel.Get(player_id);
+                if (info_panel != null)
                 {
-                    CraftSubPanel.Get().KeyClick();
+                    if (prev_slot != slot || !info_panel.IsVisible())
+                    {
+                        craftsub_panel.KeyClick();
+                    }
                 }
             }
 
             if (TheGame.Get().IsPausedByPlayer())
                 selected_panel = PausePanel.Get();
-            else if (ActionSelectorUI.Get().IsVisible())
-                selected_panel = ActionSelectorUI.Get();
-            else if (ActionSelector.Get().IsVisible())
-                selected_panel = ActionSelector.Get();
+            else if (selector_ui != null && selector_ui.IsVisible())
+                selected_panel = selector_ui;
+            else if (selector != null && selector.IsVisible())
+                selected_panel = selector;
 
-            if (selected_panel == CraftInfoPanel.Get())
+            if (selected_panel == CraftInfoPanel.Get(player_id) && selected_panel != null)
             {
-                PlayerCharacter player = CraftInfoPanel.Get().GetParentUI().GetPlayer();
+                PlayerCharacter player = PlayerCharacter.Get(player_id);
                 if (player.Crafting.GetCurrentBuildable() == null)
                     selected_panel = null;
             }
@@ -183,8 +199,8 @@ namespace SurvivalEngine
 
         public void StopNavigate()
         {
-            ActionSelector.Get().Hide();
-            ActionSelectorUI.Get().Hide();
+            ActionSelector.Get(player_id)?.Hide();
+            ActionSelectorUI.Get(player_id)?.Hide();
             selected_panel = null;
         }
 
@@ -194,50 +210,50 @@ namespace SurvivalEngine
 
             if (selected_type == SlotType.Inventory)
             {
-                InventoryPanel.Get().KeyClick();
+                InventoryPanel.Get(player_id)?.KeyClick();
             }
 
             else if (selected_type == SlotType.Equipment)
             {
-                EquipPanel.Get().KeyClick();
+                EquipPanel.Get(player_id)?.KeyClick();
             }
 
             else if(selected_type == SlotType.Storage)
             {
-                StoragePanel.Get().KeyClick();
+                StoragePanel.Get(player_id)?.KeyClick();
             }
 
             else if (selected_type == SlotType.ActionSelectorGame)
             {
-                ActionSelector.Get().KeyClick();
+                ActionSelector.Get(player_id)?.KeyClick();
                 selected_type = SlotType.None;
             }
 
             else if(selected_type == SlotType.ActionSelectorUI)
             {
-                ActionSelectorUI.Get().KeyClick();
+                ActionSelectorUI.Get(player_id)?.KeyClick();
                 selected_panel = prev_select_panel;
             }
 
             else if (selected_type == SlotType.Craft)
             {
-                if (CraftSubPanel.Get().IsVisible())
+                if (CraftSubPanel.Get(player_id) && CraftSubPanel.Get(player_id).IsVisible())
                 {
-                    selected_panel = CraftSubPanel.Get();
-                    CraftSubPanel.Get().KeyClick();
+                    selected_panel = CraftSubPanel.Get(player_id);
+                    CraftSubPanel.Get(player_id).KeyClick();
                 }
             }
 
             else if (selected_type == SlotType.CraftSub)
             {
-                if (CraftInfoPanel.Get().IsVisible())
+                if (CraftInfoPanel.Get(player_id) && CraftInfoPanel.Get(player_id).IsVisible())
                 {
-                    PlayerCharacter player = CraftInfoPanel.Get().GetParentUI().GetPlayer();
-                    CraftInfoPanel.Get().OnClickCraft();
+                    PlayerCharacter player = PlayerCharacter.Get(player_id);
+                    CraftInfoPanel.Get(player_id).OnClickCraft();
                     if (player.Crafting.IsBuildMode())
                     {
                         selected_type = SlotType.CraftInfo;
-                        CraftPanel.Get().Hide();
+                        CraftPanel.Get(player_id)?.Hide();
                     }
                 }
             }
@@ -258,26 +274,26 @@ namespace SurvivalEngine
             if (selected_type == SlotType.Inventory)
             {
                 prev_select_panel = selected_panel;
-                InventoryPanel.Get().KeyClick(true);
+                InventoryPanel.Get(player_id)?.KeyClick(true);
             }
 
             else if(selected_type == SlotType.Equipment)
             {
                 prev_select_panel = selected_panel;
-                EquipPanel.Get().KeyClick(true);
+                EquipPanel.Get(player_id)?.KeyClick(true);
             }
 
             else if(selected_type == SlotType.ActionSelectorGame)
             {
-                ActionSelector.Get().Hide();
+                ActionSelector.Get(player_id)?.Hide();
             }
 
             else if(selected_type == SlotType.ActionSelectorUI)
             {
-                ActionSelectorUI.Get().Hide();
-                InventoryPanel.Get().CancelSelection();
-                EquipPanel.Get().CancelSelection();
-                StoragePanel.Get().CancelSelection();
+                ActionSelectorUI.Get(player_id)?.Hide();
+                InventoryPanel.Get(player_id)?.CancelSelection();
+                EquipPanel.Get(player_id)?.CancelSelection();
+                StoragePanel.Get(player_id)?.CancelSelection();
                 selected_panel = prev_select_panel;
             }
 
@@ -295,36 +311,36 @@ namespace SurvivalEngine
 
             if (selected_type == SlotType.Storage)
             {
-                StoragePanel.Get().Hide();
+                StoragePanel.Get(player_id)?.Hide();
                 selected_panel = null;
             }
 
             else if (selected_type == SlotType.Craft)
             {
-                CraftPanel.Get().Toggle();
-                CraftSubPanel.Get().Hide();
+                CraftPanel.Get(player_id)?.Toggle();
+                CraftSubPanel.Get(player_id)?.Hide();
                 selected_panel = null;
             }
 
             else if (selected_type == SlotType.CraftSub)
             {
-                CraftSubPanel.Get().CancelSelection();
-                CraftInfoPanel.Get().Hide();
-                selected_panel = CraftPanel.Get();
+                CraftSubPanel.Get(player_id)?.CancelSelection();
+                CraftInfoPanel.Get(player_id)?.Hide();
+                selected_panel = CraftPanel.Get(player_id);
             }
 
             else if (selected_type == SlotType.ActionSelectorGame)
             {
-                ActionSelector.Get().Hide();
+                ActionSelector.Get(player_id)?.Hide();
                 selected_panel = null;
             }
 
             else if (selected_type == SlotType.ActionSelectorUI)
             {
-                ActionSelectorUI.Get().Hide();
-                InventoryPanel.Get().CancelSelection();
-                EquipPanel.Get().CancelSelection();
-                StoragePanel.Get().CancelSelection();
+                ActionSelectorUI.Get(player_id)?.Hide();
+                InventoryPanel.Get(player_id)?.CancelSelection();
+                EquipPanel.Get(player_id)?.CancelSelection();
+                StoragePanel.Get(player_id)?.CancelSelection();
                 selected_panel = prev_select_panel;
             }
 
@@ -387,7 +403,9 @@ namespace SurvivalEngine
 
         public bool IsCraftPanelFocus()
         {
-            return selected_panel == CraftPanel.Get() || selected_panel == CraftSubPanel.Get() || selected_panel == CraftInfoPanel.Get();
+            if (selected_panel == null)
+                return false;
+            return selected_panel == CraftPanel.Get(player_id) || selected_panel == CraftSubPanel.Get(player_id) || selected_panel == CraftInfoPanel.Get(player_id);
         }
 
         public bool IsPanelFocus()
@@ -407,9 +425,19 @@ namespace SurvivalEngine
         public bool IsDown(Vector2 dir) { return dir.y < -0.1f; }
         public bool IsUp(Vector2 dir) { return dir.y > 0.1f; }
 
-        public static KeyControlsUI Get()
+        public static KeyControlsUI Get(int player_id=0)
         {
-            return _instance;
+            foreach (KeyControlsUI panel in controls_ui_list)
+            {
+                if (panel.player_id == player_id)
+                    return panel;
+            }
+            return null;
+        }
+
+        public static List<KeyControlsUI> GetAll()
+        {
+            return controls_ui_list;
         }
     }
 

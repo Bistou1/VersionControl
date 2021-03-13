@@ -11,6 +11,8 @@ namespace SurvivalEngine
 
     public class PlayerControls : MonoBehaviour
     {
+        public int player_id = 0;
+
         [Header("Actions")]
         public KeyCode action_key = KeyCode.Space;
         public KeyCode attack_key = KeyCode.LeftShift;
@@ -74,14 +76,23 @@ namespace SurvivalEngine
         private bool press_ui_use;
         private bool press_ui_cancel;
 
-        private static PlayerControls _instance;
+        private static PlayerControls control_first = null;
+        private static List<PlayerControls> controls = new List<PlayerControls>();
 
         void Awake()
         {
-            _instance = this;
+            controls.Add(this);
+
+            if (control_first == null || player_id < control_first.player_id)
+                control_first = this;
 
             if (TheGame.IsMobile())
                 gamepad_controls = false; //No gamepad on mobile
+        }
+
+        private void OnDestroy()
+        {
+            controls.Remove(this);
         }
 
         void Update()
@@ -152,10 +163,10 @@ namespace SurvivalEngine
                 press_ui_cancel = true;
 
             Vector2 both = (arrows + wasd);
-            move = gamepad_controls ?  new Vector3(wasd.x, 0f, wasd.y) : new Vector3(wasd.x, 0f, wasd.y);
-            if(gamepad_controls)
+            move = gamepad_controls ? new Vector3(wasd.x, 0f, wasd.y) : new Vector3(wasd.x, 0f, wasd.y);
+            if (gamepad_controls)
                 freelook = arrows;
-            
+
             //Menu / UI
             if (!menu_moved && both.magnitude > 0.5f)
             {
@@ -205,23 +216,23 @@ namespace SurvivalEngine
 
         public Vector3 GetMove() { return move; }
         public Vector2 GetFreelook() { return freelook; }
-        public bool IsMoving(){ return move.magnitude > 0.1f; }
+        public bool IsMoving() { return move.magnitude > 0.1f; }
         public float GetRotateCam() { return rotate_cam; }
 
-        public bool IsPressAttack(){ return press_attack;}
-        public bool IsPressAction(){ return press_action; }
-        public bool IsPressJump(){ return press_jump;}
-        public bool IsPressCraft(){ return press_craft; }
+        public bool IsPressAttack() { return press_attack; }
+        public bool IsPressAction() { return press_action; }
+        public bool IsPressJump() { return press_jump; }
+        public bool IsPressCraft() { return press_craft; }
 
-        public Vector2 GetUIMove(){  return ui_move;}
-        public Vector2 GetMenuMove() {  return menu_move; }
+        public Vector2 GetUIMove() { return ui_move; }
+        public Vector2 GetMenuMove() { return menu_move; }
 
-        public bool IsPressMenuAccept(){return press_accept; }
-        public bool IsPressMenuCancel() { return press_cancel;}
-        public bool IsPressPause() { return press_pause;}
-        public bool IsPressUISelect(){return press_ui_select;}
-        public bool IsPressUIUse() { return press_ui_use;}
-        public bool IsPressUICancel() { return press_ui_cancel;}
+        public bool IsPressMenuAccept() { return press_accept; }
+        public bool IsPressMenuCancel() { return press_cancel; }
+        public bool IsPressPause() { return press_pause; }
+        public bool IsPressUISelect() { return press_ui_select; }
+        public bool IsPressUIUse() { return press_ui_use; }
+        public bool IsPressUICancel() { return press_ui_cancel; }
 
         public bool IsUIPressAny() { return ui_move.magnitude > 0.5f; }
         public bool IsUIPressLeft() { return ui_move.x < -0.5f; }
@@ -239,9 +250,34 @@ namespace SurvivalEngine
             return gamepad_controls;
         }
 
-        public static PlayerControls Get()
+        public static bool IsAnyGamePad()
         {
-            return _instance;
+            foreach (PlayerControls control in controls)
+            {
+                if (control.IsGamePad())
+                    return true;
+            }
+            return false;
+        }
+
+        public static PlayerControls Get(int player_id = 0)
+        {
+            foreach (PlayerControls control in controls)
+            {
+                if (control.player_id == player_id)
+                    return control;
+            }
+            return null;
+        }
+
+        public static PlayerControls GetFirst()
+        {
+            return control_first;
+        }
+
+        public static List<PlayerControls> GetAll()
+        {
+            return controls;
         }
     }
 

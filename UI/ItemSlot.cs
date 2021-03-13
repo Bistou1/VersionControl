@@ -214,12 +214,7 @@ namespace SurvivalEngine
 
         public float GetDurability()
         {
-            return durability; //This returns the DISPLAY value, not the real durability
-        }
-
-        public EquipSlot GetEquipSlot()
-        {
-            return ItemData.GetEquipType(index);
+            return durability; //This returns the DISPLAY value in %, not the actual durability value
         }
 
         public string GetInventoryUID()

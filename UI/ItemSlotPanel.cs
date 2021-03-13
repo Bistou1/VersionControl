@@ -16,7 +16,7 @@ namespace SurvivalEngine
         public UnityAction<ItemSlot> onSelectSlot;
         public UnityAction<ItemSlot, ItemSlot> onMergeSlot;
 
-        protected PlayerCharacter current_player;
+        protected PlayerCharacter current_player = null;
         protected InventoryType inventory_type;
         protected string inventory_uid;
         protected int inventory_size = 99;
@@ -30,6 +30,9 @@ namespace SurvivalEngine
         {
             base.Awake();
             slot_panels.Add(this);
+
+            for (int i = 0; i < slots.Length; i++)
+                ((ItemSlot) slots[i]).Hide();
         }
 
         private void OnDestroy()
@@ -45,13 +48,26 @@ namespace SurvivalEngine
 
             onClickSlot += OnClick;
             onRightClickSlot += OnClickRight;
+
+            InitPanel();
         }
 
         protected override void Update()
         {
             base.Update();
 
-            
+            InitPanel(); //Try to init panel if its not already
+        }
+
+        public virtual void InitPanel()
+        {
+            if (!IsPlayerSet())
+            {
+                PlayerUI player_ui = GetComponentInParent<PlayerUI>();
+                PlayerCharacter player = player_ui ? player_ui.GetPlayer() : PlayerCharacter.GetFirst();
+                if (player != null && current_player == null)
+                    current_player = player; //Set default player
+            }
         }
 
         protected override void RefreshPanel()
@@ -69,7 +85,7 @@ namespace SurvivalEngine
                     ItemSlot slot = (ItemSlot) slots[i];
                     if (invdata != null && idata != null)
                     {
-                        slot.SetSlot(idata, invdata.quantity, selected_slot == i || selected_right_slot == i);
+                        slot.SetSlot(idata, invdata.quantity, selected_slot == slot.index || selected_right_slot == slot.index);
                         slot.SetDurability(idata.GetDurabilityPercent(invdata.durability), ShouldShowDurability(idata, invdata.durability));
                         slot.SetFilter(GetFilterLevel(idata, invdata.durability));
                     }
@@ -85,13 +101,13 @@ namespace SurvivalEngine
             }
         }
 
-        private bool ShouldShowDurability(ItemData idata, float durability)
+        protected bool ShouldShowDurability(ItemData idata, float durability)
         {
             int durabi = idata.GetDurabilityPercent(durability);
             return idata.HasDurability() && durabi < 100 && (idata.durability_type != DurabilityType.Spoilage || durabi <= 50);
         }
 
-        private int GetFilterLevel(ItemData idata, float durability)
+        protected int GetFilterLevel(ItemData idata, float durability)
         {
             int durabi = idata.GetDurabilityPercent(durability);
             if (idata.HasDurability() && durabi <= 40 && idata.durability_type == DurabilityType.Spoilage)
@@ -107,7 +123,7 @@ namespace SurvivalEngine
             {
                 //Cancel right click and action selector
                 int previous_right_select = selected_right_slot;
-                ActionSelectorUI.Get().Hide();
+                ActionSelectorUI.Get(GetPlayerID()).Hide();
                 selected_right_slot = -1;
 
                 int slot = uislot.index;
@@ -145,7 +161,7 @@ namespace SurvivalEngine
             //Cancel select
             selected_slot = -1; 
             selected_right_slot = -1;
-            ActionSelectorUI.Get().Hide();
+            ActionSelectorUI.Get(GetPlayerID()).Hide();
 
             //Show action selector
             ItemSlot islot = (ItemSlot)uislot;
@@ -153,7 +169,7 @@ namespace SurvivalEngine
             if (item != null && item.GetItem() != null && item.GetItem().actions.Length > 0)
             {
                 selected_right_slot = islot.index;
-                ActionSelectorUI.Get().Show(current_player, islot);
+                ActionSelectorUI.Get(GetPlayerID()).Show(islot);
             }
         }
 
@@ -171,6 +187,11 @@ namespace SurvivalEngine
         public void SetPlayer(PlayerCharacter player)
         {
             current_player = player;
+        }
+
+        public int GetPlayerID()
+        {
+            return current_player ? current_player.player_id : 0;
         }
 
         public void MergeSlots(ItemSlot selected_slot, ItemSlot clicked_slot)
@@ -215,7 +236,8 @@ namespace SurvivalEngine
                 if (item1 != item2)
                 {
                     //Swap
-                    bool should_swap = !limit_one_item || slot1.GetInventory() == slot2.GetInventory();
+                    bool quantity_is_1 = slot1.GetQuantity() <= 1 && slot2.GetQuantity() <= 1;
+                    bool should_swap = !limit_one_item || slot1.GetInventory() == slot2.GetInventory() || quantity_is_1;
                     if (item2 == null && !should_swap)
                     {
                         SetOneItem(selected_slot, clicked_slot);
@@ -252,9 +274,10 @@ namespace SurvivalEngine
                 {
                     current_player.Inventory.EquipItem(inventory1, slot1.index);
                 }
-                else if (inventory1.type == InventoryType.Equipment)
+                else if (inventory1.type == InventoryType.Equipment && slot1 is EquipSlotUI)
                 {
-                    current_player.Inventory.UnequipItemTo(inventory2, slot1.GetEquipSlot(), slot2.index);
+                    EquipSlotUI eslot = (EquipSlotUI)slot1;
+                    current_player.Inventory.UnequipItemTo(inventory2, eslot.equip_slot, slot2.index);
                 }
                 else
                 {
@@ -332,18 +355,27 @@ namespace SurvivalEngine
             return selected_slot;
         }
 
+        public ItemSlot GetSlotByIndex(int slot_index)
+        {
+            foreach (ItemSlot slot in slots)
+            {
+                if (slot.index == slot_index)
+                    return slot;
+            }
+            return null;
+        }
+
         public ItemSlot GetSelectedSlot()
         {
-            if (selected_slot >= 0 && selected_slot < slots.Length)
-                return (ItemSlot) slots[selected_slot];
-            return null;
+            return GetSlotByIndex(selected_slot);
         }
 
         public Vector3 GetSlotWorldPosition(int slot)
         {
-            if (slot >= 0 && slot < slots.Length)
+            ItemSlot islot = GetSlotByIndex(slot);
+            if (islot != null)
             {
-                RectTransform slotRect = slots[slot].GetRect();
+                RectTransform slotRect = islot.GetRect();
                 return slotRect.position;
             }
             return Vector3.zero;
@@ -362,6 +394,16 @@ namespace SurvivalEngine
         public bool IsInventorySet()
         {
             return inventory_type != InventoryType.None;
+        }
+
+        public bool IsPlayerSet()
+        {
+            return current_player != null;
+        }
+
+        public PlayerCharacter GetPlayer()
+        {
+            return current_player;
         }
 
         public static void CancelSelectionAll()
@@ -386,6 +428,16 @@ namespace SurvivalEngine
             foreach (ItemSlotPanel panel in slot_panels)
             {
                 if (panel.inventory_type == type)
+                    return panel;
+            }
+            return null;
+        }
+
+        public static ItemSlotPanel Get(string inventory_uid)
+        {
+            foreach (ItemSlotPanel panel in slot_panels)
+            {
+                if (panel.inventory_uid == inventory_uid)
                     return panel;
             }
             return null;

@@ -22,12 +22,12 @@ namespace SurvivalEngine
 
         private List<GroupData> default_categories = new List<GroupData>();
 
-        private static CraftPanel _instance;
+        private static List<CraftPanel> panel_list = new List<CraftPanel>();
 
         protected override void Awake()
         {
             base.Awake();
-            _instance = this;
+            panel_list.Add(this);
             parent_ui = GetComponentInParent<PlayerUI>();
 
             for (int i = 0; i < slots.Length; i++)
@@ -39,6 +39,11 @@ namespace SurvivalEngine
 
             if (animator != null)
                 animator.SetBool("Visible", IsVisible());
+        }
+
+        private void OnDestroy()
+        {
+            panel_list.Remove(this);
         }
 
         protected override void Start()
@@ -57,7 +62,7 @@ namespace SurvivalEngine
         {
             base.Update();
 
-            PlayerControls controls = PlayerControls.Get();
+            PlayerControls controls = PlayerControls.Get(GetPlayerID());
 
             if (!controls.IsGamePad())
             {
@@ -107,7 +112,7 @@ namespace SurvivalEngine
                     }
                 }
 
-                CraftSubPanel.Get().Hide();
+                CraftSubPanel.Get(GetPlayerID())?.Hide();
             }
         }
 
@@ -118,7 +123,7 @@ namespace SurvivalEngine
             CancelSelection();
             if (animator != null)
                 animator.SetBool("Visible", IsVisible());
-            CraftSubPanel.Get().Hide();
+            CraftSubPanel.Get(GetPlayerID())?.Hide();
 
             RefreshCategories();
         }
@@ -130,7 +135,7 @@ namespace SurvivalEngine
             CancelSelection();
             if (animator != null)
                 animator.SetBool("Visible", IsVisible());
-            CraftSubPanel.Get().Hide();
+            CraftSubPanel.Get(GetPlayerID())?.Hide();
         }
 
         private void OnClick(UISlot uislot)
@@ -142,22 +147,22 @@ namespace SurvivalEngine
                 for (int i = 0; i < slots.Length; i++)
                     slots[i].UnselectSlot();
 
-                if (cslot.group == CraftSubPanel.Get().GetCurrentCategory())
+                if (cslot.group == CraftSubPanel.Get(GetPlayerID())?.GetCurrentCategory())
                 {
-                    CraftSubPanel.Get().Hide();
+                    CraftSubPanel.Get(GetPlayerID())?.Hide();
                 }
                 else
                 {
                     selected_slot = uislot.index;
                     uislot.SelectSlot();
-                    CraftSubPanel.Get().ShowCategory(cslot.group);
+                    CraftSubPanel.Get(GetPlayerID())?.ShowCategory(cslot.group);
                 }
             }
         }
 
         public void CancelSubSelection()
         {
-            CraftSubPanel.Get().CancelSelection();
+            CraftSubPanel.Get(GetPlayerID())?.CancelSelection();
         }
 
         public void CancelSelection()
@@ -176,9 +181,31 @@ namespace SurvivalEngine
             return selected_slot;
         }
 
-        public static CraftPanel Get()
+        public PlayerCharacter GetPlayer()
         {
-            return _instance;
+            return parent_ui ? parent_ui.GetPlayer() : PlayerCharacter.GetFirst();
+        }
+
+        public int GetPlayerID()
+        {
+            PlayerCharacter player = GetPlayer();
+            return player != null ? player.player_id : 0;
+        }
+
+        public static CraftPanel Get(int player_id=0)
+        {
+            foreach (CraftPanel panel in panel_list)
+            {
+                PlayerCharacter player = panel.GetPlayer();
+                if (player != null && player.player_id == player_id)
+                    return panel;
+            }
+            return null;
+        }
+
+        public static new List<CraftPanel> GetAll()
+        {
+            return panel_list;
         }
     }
 

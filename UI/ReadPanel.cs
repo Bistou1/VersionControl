@@ -64,6 +64,16 @@ namespace SurvivalEngine
                 return panel_list[id];
             return null;
         }
+
+        public static bool IsAnyVisible()
+        {
+            foreach (KeyValuePair<int, ReadPanel> pair in panel_list)
+            {
+                if (pair.Value.IsVisible())
+                    return true;
+            }
+            return false;
+        }
     }
 
 }

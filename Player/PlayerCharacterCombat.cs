@@ -16,10 +16,10 @@ namespace SurvivalEngine
         public bool can_attack = true;
         public int hand_damage = 5;
         public int base_armor = 0;
+        public float attack_range = 1.2f;
         public float attack_speed = 150f;
         public float attack_windup = 0.7f;
         public float attack_windout = 0.7f;
-        public float attack_range = 1.2f;
 
         [Header("Audio")]
         public AudioClip hit_sound;
@@ -214,7 +214,7 @@ namespace SurvivalEngine
         private void DoAttackStrike(Destructible target, bool is_ranged)
         {
             //Ranged attack
-            ItemData equipped = character.EquipData.GetEquippedItemData(EquipSlot.Hand);
+            ItemData equipped = character.EquipData.GetEquippedWeaponData();
             if (target != null && is_ranged && equipped != null)
             {
                 InventoryItemData projectile_inv = character.Inventory.GetFirstItemInGroup(equipped.projectile_group);
@@ -244,8 +244,8 @@ namespace SurvivalEngine
         private void DoRangedAttackStrike()
         {
             //Ranged attack
-            ItemData equipped = character.EquipData.GetEquippedItemData(EquipSlot.Hand);
-            if (equipped != null && equipped.ranged)
+            ItemData equipped = character.EquipData.GetEquippedWeaponData();
+            if (equipped != null && equipped.IsRangedWeapon())
             {
                 InventoryItemData projectile_inv = character.Inventory.GetFirstItemInGroup(equipped.projectile_group);
                 ItemData projectile = ItemData.Get(projectile_inv?.item_id);
@@ -284,7 +284,7 @@ namespace SurvivalEngine
         {
             int damage = hand_damage;
 
-            ItemData equipped = character.EquipData.GetEquippedItemData(EquipSlot.Hand);
+            ItemData equipped = character.EquipData.GetEquippedWeaponData();
             if (equipped != null && CanWeaponHitTarget(target))
                 damage = equipped.damage;
 
@@ -295,7 +295,7 @@ namespace SurvivalEngine
 
         public float GetAttackRange(Destructible target)
         {
-            ItemData equipped = character.EquipData.GetEquippedItemData(EquipSlot.Hand);
+            ItemData equipped = character.EquipData.GetEquippedWeaponData();
             if (equipped != null && CanWeaponHitTarget(target))
                 return equipped.range;
             return attack_range;
@@ -303,7 +303,7 @@ namespace SurvivalEngine
 
         public int GetAttackStrikes(Destructible target)
         {
-            ItemData equipped = character.EquipData.GetEquippedItemData(EquipSlot.Hand);
+            ItemData equipped = character.EquipData.GetEquippedWeaponData();
             if (equipped != null && CanWeaponHitTarget(target))
                 return Mathf.Max(equipped.strike_per_attack, 1);
             return 1;
@@ -311,15 +311,23 @@ namespace SurvivalEngine
 
         public float GetAttackStikesInterval(Destructible target)
         {
-            ItemData equipped = character.EquipData.GetEquippedItemData(EquipSlot.Hand);
+            ItemData equipped = character.EquipData.GetEquippedWeaponData();
             if (equipped != null && CanWeaponHitTarget(target))
                 return Mathf.Max(equipped.strike_interval, 0.01f);
             return 0.01f;
         }
 
+        public float GetAttackSpeed()
+        {
+            ItemData equipped = character.EquipData.GetEquippedWeaponData();
+            if (equipped != null)
+                return equipped.attack_speed;
+            return attack_speed;
+        }
+
         public int GetAttackStrikes()
         {
-            ItemData equipped = character.EquipData.GetEquippedItemData(EquipSlot.Hand);
+            ItemData equipped = character.EquipData.GetEquippedWeaponData();
             if (equipped != null)
                 return Mathf.Max(equipped.strike_per_attack, 1);
             return 1;
@@ -327,7 +335,7 @@ namespace SurvivalEngine
 
         public float GetAttackStikesInterval()
         {
-            ItemData equipped = character.EquipData.GetEquippedItemData(EquipSlot.Hand);
+            ItemData equipped = character.EquipData.GetEquippedWeaponData();
             if (equipped != null)
                 return Mathf.Max(equipped.strike_interval, 0.01f);
             return 0.01f;
@@ -335,7 +343,7 @@ namespace SurvivalEngine
 
         public float GetAttackWindup()
         {
-            EquipItem item_equip = character.Inventory.GetEquippedItemMesh(EquipSlot.Hand);
+            EquipItem item_equip = character.Inventory.GetEquippedWeaponMesh();
             if (item_equip != null)
                 return item_equip.attack_windup;
             return attack_windup;
@@ -343,7 +351,7 @@ namespace SurvivalEngine
 
         public float GetAttackWindout()
         {
-            EquipItem item_equip = character.Inventory.GetEquippedItemMesh(EquipSlot.Hand);
+            EquipItem item_equip = character.Inventory.GetEquippedWeaponMesh();
             if (item_equip != null)
                 return item_equip.attack_windout;
             return attack_windout;
@@ -351,23 +359,19 @@ namespace SurvivalEngine
 
         public Vector3 GetProjectileSpawnPos(ItemData weapon)
         {
-            EquipAttach attach = character.Inventory.GetEquipAttachment(EquipSlot.Hand, weapon.equip_side);
+            EquipSlot weapon_slot = character.EquipData.GetEquippedWeaponSlot();
+            EquipAttach attach = character.Inventory.GetEquipAttachment(weapon_slot, weapon.equip_side);
             if (attach != null)
                 return attach.transform.position;
             return transform.position + Vector3.up;
         }
 
-        public float GetAttackSpeed()
-        {
-            return attack_speed;
-        }
-
         //Make sure the current equipped weapon can hit target, and has enough bullets
         public bool CanWeaponHitTarget(Destructible target)
         {
-            ItemData equipped = character.EquipData.GetEquippedItemData(EquipSlot.Hand);
-            bool valid_ranged = equipped != null && equipped.ranged && CanWeaponAttackRanged(target);
-            bool valid_melee = equipped != null && !equipped.ranged;
+            ItemData equipped = character.EquipData.GetEquippedWeaponData();
+            bool valid_ranged = equipped != null && equipped.IsRangedWeapon() && CanWeaponAttackRanged(target);
+            bool valid_melee = equipped != null && equipped.IsMeleeWeapon();
             return valid_melee || valid_ranged;
         }
 
@@ -382,14 +386,14 @@ namespace SurvivalEngine
 
         public bool HasRangedWeapon()
         {
-            ItemData equipped = character.EquipData.GetEquippedItemData(EquipSlot.Hand);
-            return (equipped != null && equipped.ranged);
+            ItemData equipped = character.EquipData.GetEquippedWeaponData();
+            return (equipped != null && equipped.IsRangedWeapon());
         }
 
         public bool HasRangedProjectile()
         {
-            ItemData equipped = character.EquipData.GetEquippedItemData(EquipSlot.Hand);
-            if (equipped != null && equipped.ranged)
+            ItemData equipped = character.EquipData.GetEquippedWeaponData();
+            if (equipped != null && equipped.IsRangedWeapon())
             {
                 InventoryItemData invdata = character.InventoryData.GetFirstItemInGroup(equipped.projectile_group);
                 ItemData projectile = ItemData.Get(invdata?.item_id);

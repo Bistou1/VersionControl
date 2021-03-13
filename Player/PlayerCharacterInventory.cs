@@ -141,7 +141,7 @@ namespace SurvivalEngine
                     if (inventory.type == InventoryType.Equipment)
                     {
                         EquipData.EquipItem(item.equip_slot, item.id, item.durability, UniqueID.GenerateUniqueID());
-                        ItemTakeFX.DoTakeFX(source_pos, item, inventory.type, ItemData.GetEquipIndex(item.equip_slot));
+                        ItemTakeFX.DoTakeFX(source_pos, item, inventory.type, (int)item.equip_slot);
                     }
                     else
                     {
@@ -440,7 +440,7 @@ namespace SurvivalEngine
             {
                 InventoryItemData invdata = pair.Value;
                 ItemData idata = ItemData.Get(invdata?.item_id);
-                if (idata != null && invdata != null && idata.weapon == weapon && idata.durability_type == DurabilityType.UsageCount)
+                if (idata != null && invdata != null && idata.IsWeapon() == weapon && idata.durability_type == DurabilityType.UsageCount)
                     invdata.durability += value;
             }
         }
@@ -581,12 +581,31 @@ namespace SurvivalEngine
         //Get the EquipAttach on the character (positions on the body where the equipments can spawn)
         public EquipAttach GetEquipAttachment(EquipSlot slot, EquipSide side)
         {
+            if (slot == EquipSlot.None)
+                return null;
+
             foreach (EquipAttach attach in equip_attachments)
             {
                 if (attach.slot == slot)
                 {
                     if (attach.side == EquipSide.Default || side == EquipSide.Default || attach.side == side)
                         return attach;
+                }
+            }
+            return null;
+        }
+
+        //Get the EquipItem (spawned model for equipment items), of the first equipped weapon
+        public EquipItem GetEquippedWeaponMesh()
+        {
+            InventoryItemData invdata = EquipData.GetEquippedWeapon();
+            ItemData equipped = ItemData.Get(invdata?.item_id);
+            if (equipped != null)
+            {
+                foreach (KeyValuePair<string, EquipItem> item in equipped_items)
+                {
+                    if (item.Key == equipped.id)
+                        return item.Value;
                 }
             }
             return null;

@@ -130,10 +130,14 @@ namespace SurvivalEngine
                     onPressKey.Invoke(this);
             }
 
-            KeyControlsUI kcontrols = KeyControlsUI.Get();
-            key_hover = kcontrols != null && kcontrols.GetSelectedPanel() == parent 
-                && index >= 0 && kcontrols.GetSelectedIndex() == index && !PlayerControlsMouse.Get().IsUsingMouse();
-
+            bool use_mouse = PlayerControlsMouse.Get().IsUsingMouse();
+            key_hover = false;
+            foreach (KeyControlsUI kcontrols in KeyControlsUI.GetAll())
+            {
+                bool hover = !use_mouse && kcontrols != null && kcontrols.GetSelectedPanel() == parent
+                    && index >= 0 && kcontrols.GetSelectedIndex() == index;
+                key_hover = key_hover || hover;
+            }
         }
 
         public void SelectSlot()

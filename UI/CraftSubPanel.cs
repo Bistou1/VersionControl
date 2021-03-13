@@ -21,16 +21,21 @@ namespace SurvivalEngine
 
         private GroupData current_category;
 
-        private static CraftSubPanel _instance;
+        private static List<CraftSubPanel> panel_list = new List<CraftSubPanel>();
 
         protected override void Awake()
         {
             base.Awake();
-            _instance = this;
+            panel_list.Add(this);
             parent_ui = GetComponentInParent<PlayerUI>();
 
             if (animator != null)
                 animator.SetBool("Visible", IsVisible());
+        }
+
+        private void OnDestroy()
+        {
+            panel_list.Remove(this);
         }
 
         protected override void Start()
@@ -97,7 +102,7 @@ namespace SurvivalEngine
             base.Hide(instant);
 
             current_category = null;
-            CraftInfoPanel.Get().Hide();
+            CraftInfoPanel.Get(GetPlayerID())?.Hide();
             ShowAnim(false);
 
             if(instant && animator != null)
@@ -120,15 +125,18 @@ namespace SurvivalEngine
             foreach (ItemSlot aslot in slots)
                 aslot.UnselectSlot();
 
-            if (item == CraftInfoPanel.Get().GetData())
-            {
-                CraftInfoPanel.Get().Hide();
-            }
-            else
-            {
-                parent_ui.CancelSelection();
-                slots[slot].SelectSlot();
-                CraftInfoPanel.Get().ShowData(item);
+            CraftInfoPanel info_panel = CraftInfoPanel.Get(GetPlayerID());
+            if (info_panel) {
+                if (item == info_panel.GetData())
+                {
+                    info_panel.Hide();
+                }
+                else
+                {
+                    parent_ui.CancelSelection();
+                    slots[slot].SelectSlot();
+                    info_panel.ShowData(item);
+                }
             }
         }
 
@@ -136,7 +144,7 @@ namespace SurvivalEngine
         {
             for (int i = 0; i < slots.Length; i++)
                 slots[i].UnselectSlot();
-            CraftInfoPanel.Get().Hide();
+            CraftInfoPanel.Get(GetPlayerID())?.Hide();
         }
 
         public GroupData GetCurrentCategory()
@@ -144,9 +152,31 @@ namespace SurvivalEngine
             return current_category;
         }
 
-        public static CraftSubPanel Get()
+        public PlayerCharacter GetPlayer()
         {
-            return _instance;
+            return parent_ui ? parent_ui.GetPlayer() : PlayerCharacter.GetFirst();
+        }
+
+        public int GetPlayerID()
+        {
+            PlayerCharacter player = GetPlayer();
+            return player != null ? player.player_id : 0;
+        }
+
+        public static CraftSubPanel Get(int player_id=0)
+        {
+            foreach (CraftSubPanel panel in panel_list)
+            {
+                PlayerCharacter player = panel.GetPlayer();
+                if (player != null && player.player_id == player_id)
+                    return panel;
+            }
+            return null;
+        }
+
+        public static new List<CraftSubPanel> GetAll()
+        {
+            return panel_list;
         }
     }
 

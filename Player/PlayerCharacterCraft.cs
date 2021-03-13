@@ -22,6 +22,7 @@ namespace SurvivalEngine
         private Buildable current_buildable = null;
         private CraftData current_build_data = null;
         private CraftData current_crafting = null;
+        private GameObject craft_progress = null;
         private float build_timer = 0f;
         private float craft_timer = 0f;
         private bool clicked_build = false;
@@ -53,7 +54,7 @@ namespace SurvivalEngine
              build_timer += Time.deltaTime;
              craft_timer += Time.deltaTime;
 
-            PlayerControls controls = PlayerControls.Get();
+            PlayerControls controls = PlayerControls.Get(character.player_id);
 
             //Cancel building
             if (controls.IsPressUICancel() || controls.IsPressPause())
@@ -210,6 +211,12 @@ namespace SurvivalEngine
                 craft_timer = 0f;
                 character.StopMove();
 
+                if (AssetData.Get().action_progress != null && data.craft_duration > 0.1f)
+                {
+                    craft_progress = Instantiate(AssetData.Get().action_progress, transform);
+                    craft_progress.GetComponent<ActionProgress>().duration = data.craft_duration;
+                }
+
                 if (data.craft_duration < 0.01f)
                     CompleteCrafting();
             }
@@ -257,6 +264,8 @@ namespace SurvivalEngine
         public void CancelCrafting()
         {
             current_crafting = null;
+            if (craft_progress != null)
+                Destroy(craft_progress);
             CancelBuilding();
         }
 

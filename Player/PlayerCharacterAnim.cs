@@ -115,7 +115,7 @@ namespace SurvivalEngine
             string anim = attack_anim;
 
             //Replace anim based on current equipped item
-            EquipItem equip = character.Inventory.GetEquippedItemMesh(EquipSlot.Hand);
+            EquipItem equip = character.Inventory.GetEquippedWeaponMesh();
             if (equip != null)
             {
                 if (!ranged && !string.IsNullOrEmpty(equip.attack_melee_anim))

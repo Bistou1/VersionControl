@@ -22,8 +22,7 @@ namespace SurvivalEngine {
 
         public UnityAction onCancelSelection;
 
-        private InventoryPanel inventory_panel;
-        private EquipPanel equip_panel;
+        private ItemSlotPanel[] item_slot_panels;
 
         private static List<PlayerUI> ui_list = new List<PlayerUI>();
 
@@ -32,8 +31,7 @@ namespace SurvivalEngine {
             base.Awake();
             ui_list.Add(this);
 
-            inventory_panel = GetComponentInChildren<InventoryPanel>();
-            equip_panel = GetComponentInChildren<EquipPanel>();
+            item_slot_panels = GetComponentsInChildren<ItemSlotPanel>();
 
             if (build_mode_text != null)
                 build_mode_text.enabled = false;
@@ -53,17 +51,18 @@ namespace SurvivalEngine {
             PlayerCharacter ui_player = GetPlayer();
             if (ui_player != null)
                 ui_player.Combat.onDamaged += DoDamageFX;
+
+            PlayerControlsMouse mouse = PlayerControlsMouse.Get();
+            mouse.onRightClick += (Vector3 pos) => { CancelSelection(); };
         }
 
         protected override void Update()
         {
             base.Update();
 
-            //Init inventories
-            if (inventory_panel != null)
-                inventory_panel.InitInventory();
-            if (equip_panel != null)
-                equip_panel.InitInventory();
+            //Init inventories from here because they are disabled
+            foreach (ItemSlotPanel panel in item_slot_panels)
+                panel.InitPanel();
 
             //Fx visibility
             if (build_mode_text != null)
@@ -73,25 +72,26 @@ namespace SurvivalEngine {
                 tps_cursor.enabled = TheCamera.Get().IsLocked();
 
             //Controls
-            PlayerControls controls = PlayerControls.Get();
+            PlayerControls controls = PlayerControls.Get(player_id);
 
             if (controls.IsPressCraft())
             {
-                CraftPanel.Get().Toggle();
-                ActionSelectorUI.Get().Hide();
-                ActionSelector.Get().Hide();
+                CraftPanel.Get(player_id)?.Toggle();
+                ActionSelectorUI.Get(player_id)?.Hide();
+                ActionSelector.Get(player_id)?.Hide();
             }
 
             //Backpack panel
             PlayerCharacter character = GetPlayer();
-            if (character != null)
+            BagPanel bag_panel = BagPanel.Get(player_id);
+            if (character != null && bag_panel != null)
             {
                 InventoryItemData item = character.Inventory.GetBestEquippedBag();
                 ItemData idata = ItemData.Get(item?.item_id);
                 if (idata != null)
-                    BagPanel.Get().ShowBag(item.uid, idata.bag_size);
+                    bag_panel.ShowBag(character, item.uid, idata.bag_size);
                 else
-                    BagPanel.Get().HideBag();
+                    bag_panel.HideBag();
             }
         }
 
@@ -111,10 +111,10 @@ namespace SurvivalEngine {
         public void CancelSelection()
         {
             ItemSlotPanel.CancelSelectionAll();
-            CraftPanel.Get().CancelSelection();
-            CraftSubPanel.Get().CancelSelection();
-            ActionSelectorUI.Get().Hide();
-            ActionSelector.Get().Hide();
+            CraftPanel.Get(player_id)?.CancelSelection();
+            CraftSubPanel.Get(player_id)?.CancelSelection();
+            ActionSelectorUI.Get(player_id)?.Hide();
+            ActionSelector.Get(player_id)?.Hide();
 
             if (onCancelSelection != null)
                 onCancelSelection.Invoke();
@@ -123,7 +123,7 @@ namespace SurvivalEngine {
         public void OnClickCraft()
         {
             CancelSelection();
-            CraftPanel.Get().Toggle();
+            CraftPanel.Get(player_id)?.Toggle();
         }
 
         public ItemSlot GetSelectedSlot()

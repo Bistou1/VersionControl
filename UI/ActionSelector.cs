@@ -17,16 +17,20 @@ namespace SurvivalEngine
         private Selectable select;
         private Vector3 interact_pos;
 
-        private static ActionSelector _instance;
+        private static List<ActionSelector> selector_list = new List<ActionSelector>();
 
         protected override void Awake()
         {
             base.Awake();
 
-            _instance = this;
+            selector_list.Add(this);
             animator = GetComponent<Animator>();
             gameObject.SetActive(false);
+        }
 
+        private void OnDestroy()
+        {
+            selector_list.Remove(this);
         }
 
         protected override void Start()
@@ -145,9 +149,29 @@ namespace SurvivalEngine
             return select;
         }
 
-        public static ActionSelector Get()
+        public PlayerCharacter GetPlayer()
         {
-            return _instance;
+            return character;
+        }
+
+        public static ActionSelector Get(int player_id=0)
+        {
+            foreach (ActionSelector panel in selector_list)
+            {
+                if (panel.character == null)
+                {
+                    panel.character = PlayerCharacter.Get(player_id); //Assign character
+                }
+
+                if (panel.character != null && panel.character.player_id == player_id)
+                    return panel;
+            }
+            return null;
+        }
+
+        public static new List<ActionSelector> GetAll()
+        {
+            return selector_list;
         }
     }
 

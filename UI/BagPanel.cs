@@ -11,26 +11,23 @@ namespace SurvivalEngine
 
     public class BagPanel : ItemSlotPanel
     {
-        private PlayerUI parent_ui;
-
-        private static BagPanel _instance;
+        private static List<BagPanel> panel_list = new List<BagPanel>();
 
         protected override void Awake()
         {
             base.Awake();
-            _instance = this;
-            parent_ui = GetComponentInParent<PlayerUI>();
+            panel_list.Add(this);
 
             onSelectSlot += OnSelectSlot;
             onMergeSlot += OnMergeSlot;
         }
 
-        public void ShowBag(string uid, int max)
+        public void ShowBag(PlayerCharacter player, string uid, int max)
         {
             if (!string.IsNullOrEmpty(uid))
             {
                 SetInventory(InventoryType.Bag, uid, max);
-                SetPlayer(parent_ui.GetPlayer());
+                SetPlayer(player);
                 SetVisible(true);
             }
         }
@@ -56,9 +53,20 @@ namespace SurvivalEngine
             return inventory_uid;
         }
 
-        public static BagPanel Get()
+        public static BagPanel Get(int player_id=0)
         {
-            return _instance;
+            foreach (BagPanel panel in panel_list)
+            {
+                PlayerCharacter player = panel.GetPlayer();
+                if (player != null && player.player_id == player_id)
+                    return panel;
+            }
+            return null;
+        }
+
+        public static new List<BagPanel> GetAll()
+        {
+            return panel_list;
         }
     }
 

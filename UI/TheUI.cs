@@ -55,9 +55,9 @@ namespace SurvivalEngine
         {
             canvas.worldCamera = TheCamera.GetCamera();
 
-            if (!TheGame.IsMobile() && ItemSelectedFX.Get() == null && GameData.Get().item_select_fx != null)
+            if (!TheGame.IsMobile() && ItemSelectedFX.Get() == null && AssetData.Get().item_select_fx != null)
             {
-                Instantiate(GameData.Get().item_select_fx, transform.position, Quaternion.identity);
+                Instantiate(AssetData.Get().item_select_fx, transform.position, Quaternion.identity);
             }
 
             PlayerUI gameplay_ui = GetComponentInChildren<PlayerUI>();
@@ -68,13 +68,14 @@ namespace SurvivalEngine
         void Update()
         {
             pause_panel.SetVisible(TheGame.Get().IsPausedByPlayer());
-            
-            PlayerControls controls = PlayerControls.Get();
-            
-            if (controls.IsPressPause() && !TheGame.Get().IsPausedByPlayer())
-                TheGame.Get().Pause();
-            else if (controls.IsPressPause() && TheGame.Get().IsPausedByPlayer())
-                TheGame.Get().Unpause();
+
+            foreach (PlayerControls controls in PlayerControls.GetAll())
+            {
+                if (controls.IsPressPause() && !TheGame.Get().IsPausedByPlayer())
+                    TheGame.Get().Pause();
+                else if (controls.IsPressPause() && TheGame.Get().IsPausedByPlayer())
+                    TheGame.Get().Unpause();
+            }
 
         }
 
@@ -97,7 +98,7 @@ namespace SurvivalEngine
 
         public bool IsBlockingPanelOpened()
         {
-            return StoragePanel.Get().IsVisible() || ReadPanel.Get().IsVisible() || pause_panel.IsVisible() || game_over_panel.IsVisible();
+            return StoragePanel.IsAnyVisible() || ReadPanel.IsAnyVisible() || pause_panel.IsVisible() || game_over_panel.IsVisible();
         }
 
         //Convert a screen position (like mouse) to a anchored position in the canvas

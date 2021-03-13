@@ -38,7 +38,7 @@ namespace SurvivalEngine
             mix_button.interactable = CanMix();
 
             //Hide if too far
-            Selectable select = Selectable.GetByUID(inventory_uid);
+            Selectable select = mixing_pot?.GetSelectable();
             if (IsVisible() && player != null && select != null)
             {
                 float dist = (select.transform.position - player.transform.position).magnitude;
