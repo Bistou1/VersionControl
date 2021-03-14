@@ -109,7 +109,7 @@ namespace SurvivalEngine
             update_timer += Time.deltaTime;
             if (update_timer > 0.5f)
             {
-                update_timer = 0f;
+                update_timer = Random.Range(-0.02f, 0.02f);
                 SlowUpdate(); //Optimization
             }
         }

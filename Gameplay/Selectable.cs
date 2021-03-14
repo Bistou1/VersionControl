@@ -89,12 +89,12 @@ namespace SurvivalEngine
         {
             GenerateAutomaticOutline();
 
-            if ((TheGame.IsMobile() || PlayerControls.Get().IsGamePad()) && groups.Length > 0 && GameData.Get().item_merge_fx != null)
+            if ((TheGame.IsMobile() || PlayerControls.IsAnyGamePad()) && groups.Length > 0 && AssetData.Get().item_merge_fx != null)
             {
                 if (fx_parent == null)
                     fx_parent = new GameObject("FX");
 
-                GameObject fx = Instantiate(GameData.Get().item_merge_fx, transform.position, GameData.Get().item_merge_fx.transform.rotation);
+                GameObject fx = Instantiate(AssetData.Get().item_merge_fx, transform.position, AssetData.Get().item_merge_fx.transform.rotation);
                 fx.GetComponent<ItemMergeFX>().target = this;
                 fx.transform.SetParent(fx_parent.transform);
             }
@@ -169,7 +169,7 @@ namespace SurvivalEngine
                 }
                 else if (actions.Length > 0)
                 {
-                    ActionSelector.Get().Show(character, this, pos);
+                    ActionSelector.Get(character.player_id)?.Show(character, this, pos);
                 }
 
                 if (onUse != null)

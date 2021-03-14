@@ -28,7 +28,8 @@ namespace SurvivalEngine
         public LayerMask obstacle_layer = 1; //Cant build if of those obstacles
         public float build_obstacle_radius = 0.4f; //Can't build if obstacles within radius
         public float build_ground_dist = 0.4f; //Ground must be at least this distance on all 4 sides to build (prevent building on a wall or in the air)
-        public bool ignore_flat_ground = false; //If true, can be built on top of edge (like for the roof)
+        public bool build_flat_floor = false; //If true, must be built on mostly flat floor
+        public bool auto_destroy = false; //If true, will be destroyed if the floor underneath get destroyed
 
         [Header("FX")]
         public AudioClip build_audio;
@@ -93,7 +94,7 @@ namespace SurvivalEngine
         {
             if (building_mode && building_character != null)
             {
-                PlayerControls constrols = PlayerControls.Get();
+                PlayerControls constrols = PlayerControls.Get(building_character.player_id);
                 PlayerControlsMouse mouse = PlayerControlsMouse.Get();
 
                 if (!position_set)
@@ -126,14 +127,14 @@ namespace SurvivalEngine
 
             update_timer += Time.deltaTime;
             if (update_timer > 0.5f) {
-                update_timer = 0f;
+                update_timer = Random.Range(-0.02f, 0.02f);
                 SlowUpdate(); //Optimization
             }
             
         }
 
         private void SlowUpdate() {
-            if (destruct != null && !destruct.IsDead() && !building_mode)
+            if (destruct != null && auto_destroy && !destruct.IsDead() && !building_mode)
             {
                 if (!CheckValidFloorBuilt() || !CheckIfFlatGround())
                 {
@@ -306,8 +307,10 @@ namespace SurvivalEngine
         //Make sure there is no obstacles in between the player and the building, this applies only if placing with keyboard/gamepad
         public bool CheckIfAccessible()
         {
-            PlayerControls controls = PlayerControls.Get();
-            if (position_set || !controls.IsGamePad())
+            PlayerControls controls = PlayerControls.Get(building_character.player_id);
+            bool game_pad = controls != null && controls.IsGamePad();
+
+            if (position_set || !game_pad)
                 return true; //Dont check this is placing with mouse or if position already set
 
             if (building_character != null)
@@ -327,7 +330,7 @@ namespace SurvivalEngine
         //Check if there is a flat floor underneath (can't build a steep cliff)
         public bool CheckIfFlatGround()
         {
-            if (ignore_flat_ground)
+            if (!build_flat_floor)
                 return true; //Dont check for flat ground
 
             Vector3 center = transform.position + Vector3.up * build_ground_dist;
@@ -371,7 +374,10 @@ namespace SurvivalEngine
             f3 = f3 && PhysicsTool.IsLayerIsInLayerMask(h3.collider.gameObject.layer, floor_layer);
             f4 = f4 && PhysicsTool.IsLayerIsInLayerMask(h4.collider.gameObject.layer, floor_layer);
 
-            return f1 || f2 || f3 || f4 || f0;
+            if(build_flat_floor)
+                return f1 && f2 && f3 && f4 && f0; //Floor must be valid on all sides
+            else
+                return f1 || f2 || f3 || f4 || f0; //Floor must be valid only on one side
         }
 
         //Check if its still valid floor after built, this one ignore itself and check only the layer (less strict)

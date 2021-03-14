@@ -14,6 +14,7 @@ namespace SurvivalEngine
         public float spawn_interval = 8f; //In game hours
         public float spawn_radius = 10f; //Circle radius of the spawn zone, keep it big enough so it can keep track of the already spawned ones.
         public int spawn_max = 1; //If there are more than this already in the radius, will stop spawning.
+        public float spawn_max_radius = 10f; //If there are more than this already in this radius, will stop spawning.
         public LayerMask valid_floor_layer = (1 << 9); //Floor that this can be spawned on
         public CraftData[] spawn_data; //The objects to spawn
 
@@ -84,7 +85,7 @@ namespace SurvivalEngine
             int count = 0;
             foreach (CraftData data in spawn_data)
             {
-                count += CraftData.CountObjectInRadius(data, transform.position, spawn_radius);
+                count += CraftData.CountObjectInRadius(data, transform.position, spawn_max_radius);
             }
             return count;
         }

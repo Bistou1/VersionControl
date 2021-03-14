@@ -49,6 +49,8 @@ namespace SurvivalEngine
         public bool shake_on_hit = true; //Shake animation when hit
         public float destroy_delay = 0f; //In seconds, use this if you want a death animation before the object disappears
         public GameObject attack_center; //For projectiles mostly, since most objects have their pivot directly on the floor, we sometimes dont want projectiles to aim at the pivot but at this position instead
+
+        public GameObject hp_bar;
         public GameObject hit_fx; //Prefab spawned then hit
         public GameObject death_fx; //Prefab spawned then dying
         public AudioClip hit_sound;
@@ -69,6 +71,7 @@ namespace SurvivalEngine
         private float shake_timer = 0f;
         private float shake_intensity = 1f;
         private int max_hp;
+        private HPBar hbar = null;
 
         void Awake()
         {
@@ -113,6 +116,14 @@ namespace SurvivalEngine
                 {
                     is_shaking = false;
                 }
+            }
+
+            //Spawn HP bar
+            if (hp > 0 && hp < max_hp && hbar == null && hp_bar != null)
+            {
+                GameObject hp_obj = Instantiate(hp_bar, transform);
+                hbar = hp_obj.GetComponent<HPBar>();
+                hbar.target = this;
             }
         }
 

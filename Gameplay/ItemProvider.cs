@@ -92,7 +92,8 @@ namespace SurvivalEngine
             if (HasItem())
             {
                 string animation = player ? PlayerCharacterAnim.Get().take_anim : "";
-                player.TriggerAction(animation, transform.position, 0.5f, () =>
+                player.TriggerAnim(animation, transform.position);
+                player.TriggerAction(0.5f, () =>
                 {
                     RemoveItem();
                     GainItem(player);

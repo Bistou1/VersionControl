@@ -12,6 +12,7 @@ namespace SurvivalEngine
         public GameObject active_fx;
         public AudioClip put_audio;
         public AudioClip finish_audio;
+        public GameObject progress_prefab;
 
         private Selectable select;
         private ItemData prev_item = null;
@@ -19,6 +20,7 @@ namespace SurvivalEngine
         private int current_quantity= 0;
         private float timer = 0f;
         private float duration = 0f; //In game hours
+        private ActionProgress progress;
 
         private static List<Furnace> furnace_list = new List<Furnace>();
 
@@ -47,6 +49,9 @@ namespace SurvivalEngine
                     FinishItem();
                 }
 
+                if (progress != null)
+                    progress.manual_value = timer / duration;
+
                 if (active_fx != null && active_fx.activeSelf != HasItem())
                     active_fx.SetActive(HasItem());
             }
@@ -61,6 +66,13 @@ namespace SurvivalEngine
                 current_quantity += quantity;
                 timer = 0f;
                 this.duration = duration;
+
+                if (progress_prefab != null && duration > 0.1f)
+                {
+                    GameObject obj = Instantiate(progress_prefab, transform);
+                    progress = obj.GetComponent<ActionProgress>();
+                    progress.manual = true;
+                }
 
                 if (select.IsNearCamera(10f))
                     TheAudio.Get().PlaySFX("furnace", put_audio);
@@ -80,6 +92,9 @@ namespace SurvivalEngine
 
                 if (active_fx != null)
                     active_fx.SetActive(false);
+
+                if (progress != null)
+                    Destroy(progress.gameObject);
 
                 if (select.IsNearCamera(10f))
                     TheAudio.Get().PlaySFX("furnace", finish_audio);

@@ -30,6 +30,7 @@ namespace SurvivalEngine
         public float slope_angle_max = 45f;
         public float ground_detect_dist = 0.1f;
         public LayerMask ground_layer = ~0;
+        public float ground_refresh_rate = 0.2f;
 
         [Header("Attack")]
         public bool attack_enabled = true;
@@ -95,6 +96,7 @@ namespace SurvivalEngine
         private bool follow_path = false;
         private bool calculating_path = false;
         private float navmesh_timer = 0f;
+        private float ground_refesh_timer = 0f;
 
         private static List<Character> character_list = new List<Character>();
 
@@ -147,16 +149,14 @@ namespace SurvivalEngine
                 transform.position = sobj.pos;
                 transform.rotation = sobj.rot;
             }
+
+            DetectGrounded(); //Check grounded
         }
 
         private void FixedUpdate()
         {
             if (TheGame.Get().IsPaused())
                 return;
-
-            //Detect obstacles and ground
-            DetectGrounded();
-            DetectFronted();
 
             if (!move_enabled)
                 return;
@@ -264,6 +264,15 @@ namespace SurvivalEngine
             attack_timer += Time.deltaTime;
             move_timer += Time.deltaTime;
             navmesh_timer += Time.deltaTime;
+            ground_refesh_timer += Time.deltaTime;
+
+            //Detect obstacles and ground
+            if (ground_refesh_timer > ground_refresh_rate)
+            {
+                ground_refesh_timer = Random.Range(-0.02f, 0.02f);
+                DetectGrounded();
+                DetectFronted();
+            }
 
             //Save position
             PlayerData.Get().SetCharacterPosition(GetUID(), SceneNav.GetCurrentScene(), transform.position, transform.rotation);
@@ -541,7 +550,7 @@ namespace SurvivalEngine
             center.y = transform.position.y + center_offset;
 
             float gdist; Vector3 gnormal;
-            is_grounded = PhysicsTool.DetectGround(transform.position, center, hradius, radius, ground_layer, out gdist, out gnormal);
+            is_grounded = PhysicsTool.DetectGround(transform, center, hradius, radius, ground_layer, out gdist, out gnormal);
             ground_normal = gnormal;
             grounded_dist = gdist;
 

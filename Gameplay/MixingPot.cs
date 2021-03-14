@@ -4,6 +4,8 @@ using UnityEngine;
 
 namespace SurvivalEngine {
 
+    [RequireComponent(typeof(Selectable))]
+    [RequireComponent(typeof(UniqueID))]
     public class MixingPot : MonoBehaviour
     {
         public ItemData[] recipes;
@@ -26,7 +28,19 @@ namespace SurvivalEngine {
 
         private void OnUse(PlayerCharacter player)
         {
-            MixingPanel.Get().ShowMixing(player, this, select.GetUID());
+            if (!string.IsNullOrEmpty(select.GetUID()))
+            {
+                MixingPanel.Get().ShowMixing(player, this, select.GetUID());
+            }
+            else
+            {
+                Debug.LogError("You must generate the UID to use the mixing pot feature.");
+            }
+        }
+
+        public Selectable GetSelectable()
+        {
+            return select;
         }
     }
 

@@ -39,8 +39,9 @@ namespace SurvivalEngine
 
         private void OnUse(PlayerCharacter character)
         {
-            if (!CraftPanel.Get().IsVisible())
-                CraftPanel.Get().Show();
+            CraftPanel panel = CraftPanel.Get(character.player_id);
+            if (panel != null && !panel.IsVisible())
+                panel.Show();
         }
 
         public bool HasCrafting()
