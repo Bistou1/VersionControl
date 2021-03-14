@@ -26,7 +26,7 @@ namespace SurvivalEngine
     /// <summary>
     /// Animal behavior script for wandering, escaping, or chasing the player
     /// </summary>
-    
+
     [RequireComponent(typeof(Rigidbody))]
     [RequireComponent(typeof(Selectable))]
     [RequireComponent(typeof(Destructible))]
@@ -57,7 +57,9 @@ namespace SurvivalEngine
 
         private AnimalState state;
         private Character character;
+        private Selectable selectable;
         private Destructible destruct;
+        private Animator animator;
 
         private Vector3 start_pos;
 
@@ -77,6 +79,8 @@ namespace SurvivalEngine
         {
             character = GetComponent<Character>();
             destruct = GetComponent<Destructible>();
+            selectable = GetComponent<Selectable>();
+            animator = GetComponentInChildren<Animator>();
             start_pos = transform.position;
 
             character.onAttack += OnAttack;
@@ -86,6 +90,13 @@ namespace SurvivalEngine
             update_timer = Random.Range(-1f, 1f);
 
             transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+        }
+
+        void Start()
+        {
+            onAttack += OnAttack;
+            onDamaged += OnDamaged;
+            onDeath += OnDeath;
         }
 
         void FixedUpdate()
@@ -103,6 +114,10 @@ namespace SurvivalEngine
 
         private void Update()
         {
+            //Animations
+            bool paused = TheGame.Get().IsPaused();
+            animator.enabled = !paused && selectable.AreScriptsActive();
+
             if (TheGame.Get().IsPaused())
                 return;
 
@@ -117,7 +132,7 @@ namespace SurvivalEngine
 
             state_timer += Time.deltaTime;
 
-            if(state != AnimalState.MoveTo)
+            if (state != AnimalState.MoveTo)
                 is_running = (state == AnimalState.Escape || state == AnimalState.Attack);
 
             character.move_speed = is_running ? run_speed : wander_speed;
@@ -171,8 +186,7 @@ namespace SurvivalEngine
 
                     if (targ_dir.magnitude > detect_range && state_timer > action_duration)
                     {
-                        ChangeState(AnimalState.Wander);
-                        character.Stop();
+                        StopAction();
                     }
                 }
 
@@ -212,9 +226,17 @@ namespace SurvivalEngine
                 update_timer = Random.Range(-0.02f, 0.02f);
                 SlowUpdate(); //Optimization
             }
+
+            //Animations
+            if (animator.enabled)
+            {
+                animator.SetBool("Move", IsMoving() && IsActive());
+                animator.SetBool("Run", IsRunning() && IsActive());
+            }
         }
 
-        private void SlowUpdate(){
+        private void SlowUpdate()
+        {
             if (state == AnimalState.Wander)
             {
                 //These behavior trigger a reaction on sight, while the "Defense" behavior only trigger a reaction when attacked
@@ -232,7 +254,7 @@ namespace SurvivalEngine
         }
 
         //Detect if the player is in vision
-        private void DetectThreat(float range, bool anyside=false)
+        private void DetectThreat(float range, bool anyside = false)
         {
             Vector3 pos = transform.position;
 
@@ -435,12 +457,6 @@ namespace SurvivalEngine
             lure_interest = 8f;
         }
 
-        private void OnAttack()
-        {
-            if (onAttack != null)
-                onAttack.Invoke();
-        }
-
         private void OnTakeDamage()
         {
             if (IsDead())
@@ -461,9 +477,24 @@ namespace SurvivalEngine
                 onDeath.Invoke();
         }
 
+        void OnAttack()
+        {
+            animator.SetTrigger("Attack");
+        }
+
+        void OnDamaged()
+        {
+            animator.SetTrigger("Damaged");
+        }
+
+        void OnDeath()
+        {
+            animator.SetTrigger("Death");
+        }
+
         public bool HasAttackBehavior()
         {
-            return behavior == AnimalBehavior.Aggressive  || behavior == AnimalBehavior.VeryAggressive || behavior == AnimalBehavior.PassiveDefense;
+            return behavior == AnimalBehavior.Aggressive || behavior == AnimalBehavior.VeryAggressive || behavior == AnimalBehavior.PassiveDefense;
         }
 
         public bool HasEscapeBehavior()
