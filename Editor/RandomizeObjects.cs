@@ -15,7 +15,7 @@ namespace SurvivalEngine.EditorTool
         public float noise_dist = 1f;
 
         [MenuItem("Survival Engine/Randomize Objects", priority = 302)]
-        static void SelectAllOfTagWizard()
+        static void ScriptableWizardMenu()
         {
             ScriptableWizard.DisplayWizard<RandomizeObjects>("Randomize Objects", "Randomize Objects");
         }

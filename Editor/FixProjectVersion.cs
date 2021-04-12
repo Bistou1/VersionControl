@@ -12,7 +12,7 @@ namespace SurvivalEngine.EditorTool
     public class FixProjectVersion : ScriptableWizard
     {
         [MenuItem("Survival Engine/Fix Project Version", priority = 400)]
-        static void SelectAllOfTagWizard()
+        static void ScriptableWizardMenu()
         {
             ScriptableWizard.DisplayWizard<FixProjectVersion>("Fix Project Version", "Fix");
         }
@@ -42,7 +42,7 @@ namespace SurvivalEngine.EditorTool
                     }
 
                     //Add character to animals
-                    if (prefab.GetComponent<Animal>() != null && prefab.GetComponent<Character>() == null)
+                    if (prefab.GetComponent<AnimalWild>() != null && prefab.GetComponent<Character>() == null)
                     {
                         prefab.AddComponent<Character>();
                         EditorUtility.SetDirty(prefab);
@@ -87,14 +87,6 @@ namespace SurvivalEngine.EditorTool
                         prefab.AddComponent<PlayerCharacterCraft>();
                         EditorUtility.SetDirty(prefab);
                         Debug.Log("Added PlayerCharacterCraft Component to: " + prefab_path);
-                    }
-
-                    //Remove PlayerCharacterEquip
-                    if (prefab.GetComponent<PlayerCharacterEquip>() != null)
-                    {
-                        DestroyImmediate(prefab.GetComponent<PlayerCharacterEquip>(), true);
-                        EditorUtility.SetDirty(prefab);
-                        Debug.Log("Removed PlayerCharacterEquip Component from: " + prefab_path);
                     }
 
                     //Fix selectable

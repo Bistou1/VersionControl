@@ -16,7 +16,7 @@ namespace SurvivalEngine.EditorTool
     {
 
         [MenuItem("Survival Engine/Clear UIDs", priority = 201)]
-        static void SelectAllOfTagWizard()
+        static void ScriptableWizardMenu()
         {
             ScriptableWizard.DisplayWizard<ClearUIDs>("Clear Unique IDs", "Clear All UIDs");
         }

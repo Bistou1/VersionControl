@@ -45,9 +45,11 @@ namespace SurvivalEngine
             if (active != icon_group.activeSelf)
                 icon_group.SetActive(active);
 
+            icon.enabled = false;
             if (current_slot != null && current_slot.GetItem())
             {
                 icon.sprite = current_slot.GetItem().icon;
+                icon.enabled = true;
             }
 
             timer += Time.deltaTime;

@@ -14,7 +14,7 @@ namespace SurvivalEngine.EditorTool
         public Vector3 rotate;
 
         [MenuItem("Survival Engine/Transform Group", priority = 300)]
-        static void SelectAllOfTagWizard()
+        static void ScriptableWizardMenu()
         {
             ScriptableWizard.DisplayWizard<MoveObjects>("Transform Group", "Transform Group");
         }

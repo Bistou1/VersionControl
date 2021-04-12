@@ -44,7 +44,7 @@ namespace SurvivalEngine.EditorTool
         public CreateObjectSettings settings;
 
         [MenuItem("Survival Engine/Create New Object", priority = 1)]
-        static void SelectAllOfTagWizard()
+        static void ScriptableWizardMenu()
         {
             ScriptableWizard.DisplayWizard<CreateObject>("CreateObject", "CreateObject");
         }

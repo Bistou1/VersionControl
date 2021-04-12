@@ -15,7 +15,7 @@ namespace SurvivalEngine.EditorTool
         public GameObject NewPrefab;
 
         [MenuItem("Survival Engine/Replace Prefab", priority = 304)]
-        static void SelectAllOfTagWizard()
+        static void ScriptableWizardMenu()
         {
             ScriptableWizard.DisplayWizard<ReplacePrefab>("Replace Prefabs", "Replace Prefabs");
         }

@@ -12,7 +12,7 @@ namespace SurvivalEngine.EditorTool
     {
 
         [MenuItem("Survival Engine/Align Objects", priority = 301)]
-        static void SelectAllOfTagWizard()
+        static void ScriptableWizardMenu()
         {
             ScriptableWizard.DisplayWizard<AlignObjects>("AlignObjects", "AlignObjects");
         }

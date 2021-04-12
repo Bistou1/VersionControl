@@ -20,7 +20,7 @@ namespace SurvivalEngine.EditorTool
         private Dictionary<int, string> copied_prefabs = new Dictionary<int, string>();
 
         [MenuItem("Survival Engine/Duplicate Object", priority = 2)]
-        static void SelectAllOfTagWizard()
+        static void ScriptableWizardMenu()
         {
             ScriptableWizard.DisplayWizard<DuplicateObject>("DuplicateObject", "DuplicateObject");
         }

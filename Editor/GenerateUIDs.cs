@@ -13,7 +13,7 @@ namespace SurvivalEngine.EditorTool
     public class GenerateUIDs : ScriptableWizard
     {
         [MenuItem("Survival Engine/Generate UIDs", priority = 200)]
-        static void SelectAllOfTagWizard()
+        static void ScriptableWizardMenu()
         {
             ScriptableWizard.DisplayWizard<GenerateUIDs>("Generate Unique IDs", "Generate All UIDs");
         }
