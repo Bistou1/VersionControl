@@ -32,6 +32,7 @@ namespace SurvivalEngine
         [Header("Stats")]
         public int hp = 100;
         public int armor = 0; //Reduces each attack's damage by the armor value
+        public float hp_regen = 0f; //HP regen per game-hour
 
         [Header("Targeting")]
         public AttackGroup attack_group; //Check above for description of each group
@@ -71,6 +72,7 @@ namespace SurvivalEngine
         private float shake_timer = 0f;
         private float shake_intensity = 1f;
         private int max_hp;
+        private float hp_regen_val;
         private HPBar hbar = null;
 
         void Awake()
@@ -90,9 +92,9 @@ namespace SurvivalEngine
                 return;
             }
 
-            if (HasUID() && PlayerData.Get().HasUniqueID(GetHpUID()))
+            if (HasUID() && PlayerData.Get().HasCustomValue(GetHpUID()))
             {
-                hp = PlayerData.Get().GetUniqueID(GetHpUID());
+                hp = PlayerData.Get().GetCustomValue(GetHpUID());
             }
         }
 
@@ -125,6 +127,18 @@ namespace SurvivalEngine
                 hbar = hp_obj.GetComponent<HPBar>();
                 hbar.target = this;
             }
+
+            //Regen HP
+            if (!dead && hp_regen > 0.01f && hp < max_hp)
+            {
+                float game_speed = TheGame.Get().GetGameTimeSpeedPerSec();
+                hp_regen_val += game_speed * Time.deltaTime;
+                if (hp_regen_val >= 1f)
+                {
+                    hp_regen_val -= 1f;
+                    hp += 1;
+                }
+            }
         }
 
         //Deal damages to the destructible, if it reaches 0 HP it will be killed
@@ -135,7 +149,7 @@ namespace SurvivalEngine
                 int adamage = Mathf.Max(damage - armor, 1);
                 hp -= adamage;
 
-                PlayerData.Get().SetUniqueID(GetHpUID(), hp);
+                PlayerData.Get().SetCustomValue(GetHpUID(), hp);
 
                 if (shake_on_hit)
                     ShakeFX();
@@ -163,12 +177,24 @@ namespace SurvivalEngine
                 hp += value;
                 hp = Mathf.Min(hp, max_hp);
 
-                PlayerData.Get().SetUniqueID(GetHpUID(), hp);
+                PlayerData.Get().SetCustomValue(GetHpUID(), hp);
             }
         }
 
         //Kill the destructible
         public void Kill()
+        {
+            if (!dead)
+            {
+                SpawnLoots();
+                GiveXPLoot();
+                DropStorage();
+                KillFX();
+                KillNoLoot();
+            }
+        }
+
+        public void KillNoLoot()
         {
             if (!dead)
             {
@@ -178,26 +204,25 @@ namespace SurvivalEngine
                 foreach (Collider collide in colliders)
                     collide.enabled = false;
 
-                SpawnLoots();
-                GiveXPLoot();
-                DropStorage();
-
                 PlayerData.Get().RemoveObject(GetUID());
-                PlayerData.Get().RemoveUniqueID(GetHpUID());
-
-                //FX
-                if (select.IsActive() && select.IsNearCamera(20f))
-                {
-                    if (death_fx != null)
-                        Instantiate(death_fx, transform.position, Quaternion.identity);
-
-                    TheAudio.Get().PlaySFX("destruct", death_sound);
-                }
+                PlayerData.Get().RemoveCustomValue(GetHpUID());
 
                 if (onDeath != null)
                     onDeath.Invoke();
 
                 select.Destroy(destroy_delay);
+            }
+        }
+
+        private void KillFX()
+        {
+            //FX
+            if (select.IsActive() && select.IsNearCamera(20f))
+            {
+                if (death_fx != null)
+                    Instantiate(death_fx, transform.position, Quaternion.identity);
+
+                TheAudio.Get().PlaySFX("destruct", death_sound);
             }
         }
 

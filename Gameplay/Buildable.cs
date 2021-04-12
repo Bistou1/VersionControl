@@ -35,7 +35,7 @@ namespace SurvivalEngine
         public AudioClip build_audio;
         public GameObject build_fx;
 
-        public UnityAction<PlayerCharacter> onBuild;
+        public UnityAction onBuild;
 
         protected Selectable selectable; //Can be nulls
         protected Destructible destruct; //Can be nulls
@@ -195,7 +195,7 @@ namespace SurvivalEngine
             }
         }
 
-        public void FinishBuild(PlayerCharacter player)
+        public void FinishBuild()
         {
             gameObject.SetActive(true);
             building_mode = false;
@@ -219,7 +219,7 @@ namespace SurvivalEngine
                 Instantiate(build_fx, transform.position, Quaternion.identity);
             
             if (onBuild != null)
-                onBuild.Invoke(player);
+                onBuild.Invoke();
         }
 
         private void SetModelColor(Color color, bool replace)

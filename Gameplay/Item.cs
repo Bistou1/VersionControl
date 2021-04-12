@@ -152,6 +152,11 @@ namespace SurvivalEngine
             return unique_id.unique_id;
         }
 
+        public bool HasGroup(GroupData group)
+        {
+            return data.HasGroup(group) || selectable.HasGroup(group);
+        }
+
         public Selectable GetSelectable()
         {
             return selectable;

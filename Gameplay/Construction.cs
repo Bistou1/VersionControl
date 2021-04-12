@@ -37,7 +37,7 @@ namespace SurvivalEngine
             destruct = GetComponent<Destructible>();
             unique_id = GetComponent<UniqueID>();
 
-            buildable.onBuild += OnFinishBuild;
+            buildable.onBuild += OnBuild;
 
             if (selectable != null)
             {
@@ -65,16 +65,6 @@ namespace SurvivalEngine
 
         }
 
-        public void OnFinishBuild(PlayerCharacter player)
-        {
-            if (data != null)
-            {
-                int pid = player != null ? player.player_id : -1;
-                BuiltConstructionData cdata = PlayerData.Get().AddConstruction(data.id, SceneNav.GetCurrentScene(), pid, transform.position, transform.rotation, data.durability);
-                unique_id.unique_id = cdata.uid;
-            }
-        }
-
         public void Kill()
         {
             if (destruct != null)
@@ -83,6 +73,15 @@ namespace SurvivalEngine
                 selectable.Destroy();
             else
                 Destroy(gameObject);
+        }
+
+        private void OnBuild()
+        {
+            if (data != null)
+            {
+                BuiltConstructionData cdata = PlayerData.Get().AddConstruction(data.id, SceneNav.GetCurrentScene(), transform.position, transform.rotation, data.durability);
+                unique_id.unique_id = cdata.uid;
+            }
         }
 
         private void OnDeath()
@@ -118,6 +117,13 @@ namespace SurvivalEngine
         public string GetUID()
         {
             return unique_id.unique_id;
+        }
+
+        public bool HasGroup(GroupData group)
+        {
+            if (data != null)
+                return data.HasGroup(group) || selectable.HasGroup(group);
+            return selectable.HasGroup(group);
         }
 
         public Selectable GetSelectable()
@@ -247,21 +253,16 @@ namespace SurvivalEngine
         //Create a totally new one that will be added to save file, already constructed
         public static Construction Create(ConstructionData data, Vector3 pos)
         {
-            return Create(data, pos, null); //Owned by nature/npc
-        }
-
-        public static Construction Create(ConstructionData data, Vector3 pos, PlayerCharacter owner)
-        {
             Construction construct = CreateBuildMode(data, pos);
-            construct.buildable.FinishBuild(owner);
+            construct.buildable.FinishBuild();
             return construct;
         }
 
-        public static Construction Create(ConstructionData data, Vector3 pos, Quaternion rot, PlayerCharacter owner = null)
+        public static Construction Create(ConstructionData data, Vector3 pos, Quaternion rot)
         {
             Construction construct = CreateBuildMode(data, pos);
             construct.transform.rotation = rot;
-            construct.buildable.FinishBuild(owner);
+            construct.buildable.FinishBuild();
             return construct;
         }
     }

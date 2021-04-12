@@ -9,7 +9,8 @@ namespace SurvivalEngine
     {
         Interact=0,
         InteractSurface=10, //When it's a surface, can be interacted with at different position among the surface, instead of just the center
-        CantInteract =20,
+        CantInteract =20, //Can be clicked on/hovered, but cant interact
+        CantSelect=30, //Cannot be clicked on or hovered
     }
 
     /// <summary>
@@ -108,7 +109,7 @@ namespace SurvivalEngine
                     outline.SetActive(is_hovered);
             }
 
-            is_hovered = PlayerControlsMouse.Get().IsInRaycast(gameObject);
+            is_hovered = PlayerControlsMouse.Get().IsInRaycast(this);
         }
 
         private void GenerateAutomaticOutline()
@@ -122,6 +123,10 @@ namespace SurvivalEngine
                     GameObject new_outline = Instantiate(render.gameObject, render.transform.position, render.transform.rotation);
                     new_outline.name = "OutlineMesh";
                     new_outline.transform.localScale = render.transform.lossyScale; //Preserve scale from parents
+
+                    foreach (MonoBehaviour script in new_outline.GetComponents<MonoBehaviour>())
+                        script.enabled = false; //Disable scripts
+
                     MeshRenderer out_render = new_outline.GetComponent<MeshRenderer>();
                     Material[] mats = new Material[out_render.sharedMaterials.Length];
                     for (int i = 0; i < mats.Length; i++)
@@ -253,9 +258,15 @@ namespace SurvivalEngine
         }
 
         //Player can interact with it by clicking on it, such as using actions
+        public bool CanBeClicked()
+        {
+            return is_active && enabled && type != SelectableType.CantSelect;
+        }
+
+        //Player can interact with it by clicking on it, such as using actions
         public bool CanBeInteracted()
         {
-            return is_active && enabled && type != SelectableType.CantInteract;
+            return is_active && enabled && type != SelectableType.CantInteract && type != SelectableType.CantSelect;
         }
 
         //Player can interact automatically with this

@@ -12,6 +12,7 @@ namespace SurvivalEngine
     public class Trap : MonoBehaviour
     {
         public int damage = 50;
+        public GroupData target_group; //If set, will only trap that group, if not set, will trap all characters
 
         public GameObject active_model;
         public GameObject triggered_model;
@@ -71,8 +72,12 @@ namespace SurvivalEngine
         {
             if (!triggered)
             {
-                if (other.GetComponent<Character>())
-                    Trigger(other.GetComponent<Character>());
+                Character character = other.GetComponent<Character>();
+                if (character != null)
+                {
+                    if (target_group == null || character.HasGroup(target_group))
+                        Trigger(character);
+                }
             }
         }
     }

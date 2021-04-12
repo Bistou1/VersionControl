@@ -30,7 +30,7 @@ namespace SurvivalEngine
         public float detect_range = 5f;
         public float detect_angle = 360f;
         public float detect_360_range = 1f;
-        public float alerted_duration = 0.5f;
+        public float reaction_time = 0.2f;
 
         [Header("Models")]
         public Animator sit_model;
@@ -81,7 +81,7 @@ namespace SurvivalEngine
 
             if (state == BirdState.Alerted)
             {
-                if (state_timer > alerted_duration)
+                if (state_timer > reaction_time)
                 {
                     FlyAway();
                 }

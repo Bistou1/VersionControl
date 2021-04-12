@@ -8,7 +8,9 @@ namespace SurvivalEngine
     public class Furnace : MonoBehaviour
     {
         public GameObject spawn_point;
+        public int quantity_max = 1;
 
+        [Header("FX")]
         public GameObject active_fx;
         public AudioClip put_audio;
         public AudioClip finish_audio;
@@ -57,26 +59,35 @@ namespace SurvivalEngine
             }
         }
 
-        public void PutItem(ItemData item, ItemData create, float duration, int quantity)
+        public int PutItem(ItemData item, ItemData create, float duration, int quantity)
         {
-            if (current_item == null || item == current_item)
+            if (current_item == null || create == current_item)
             {
-                prev_item = item;
-                current_item = create;
-                current_quantity += quantity;
-                timer = 0f;
-                this.duration = duration;
-
-                if (progress_prefab != null && duration > 0.1f)
+                if (current_quantity < quantity_max && quantity > 0)
                 {
-                    GameObject obj = Instantiate(progress_prefab, transform);
-                    progress = obj.GetComponent<ActionProgress>();
-                    progress.manual = true;
-                }
+                    int max = quantity_max - current_quantity; //Maximum space remaining
+                    int quant = Mathf.Min(max, quantity + current_quantity); //Cant put more than maximum
 
-                if (select.IsNearCamera(10f))
-                    TheAudio.Get().PlaySFX("furnace", put_audio);
+                    prev_item = item;
+                    current_item = create;
+                    current_quantity += quant;
+                    timer = 0f;
+                    this.duration = duration;
+
+                    if (progress_prefab != null && duration > 0.1f)
+                    {
+                        GameObject obj = Instantiate(progress_prefab, transform);
+                        progress = obj.GetComponent<ActionProgress>();
+                        progress.manual = true;
+                    }
+
+                    if (select.IsNearCamera(10f))
+                        TheAudio.Get().PlaySFX("furnace", put_audio);
+
+                    return quant;  //Return actual quantity that was used
+                }
             }
+            return 0;
         }
 
         public void FinishItem()
@@ -104,6 +115,11 @@ namespace SurvivalEngine
         public bool HasItem()
         {
             return current_item != null;
+        }
+
+        public int CountItemSpace()
+        {
+            return quantity_max - current_quantity; //Number of items that can still be placed inside
         }
 
         public static Furnace GetNearestInRange(Vector3 pos, float range=999f)

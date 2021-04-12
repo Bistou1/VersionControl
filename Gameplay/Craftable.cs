@@ -158,21 +158,21 @@ namespace SurvivalEngine
             if (data is PlantData)
             {
                 PlantData item = (PlantData)data;
-                Plant obj = Plant.Create(item, pos, -1, owner);
+                Plant obj = Plant.Create(item, pos, -1);
                 return obj.gameObject;
             }
 
             if (data is ConstructionData)
             {
                 ConstructionData item = (ConstructionData)data;
-                Construction obj = Construction.Create(item, pos, owner);
+                Construction obj = Construction.Create(item, pos);
                 return obj.gameObject;
             }
 
             if (data is CharacterData)
             {
                 CharacterData item = (CharacterData)data;
-                Character obj = Character.Create(item, pos, owner);
+                Character obj = Character.Create(item, pos);
                 return obj.gameObject;
             }
 

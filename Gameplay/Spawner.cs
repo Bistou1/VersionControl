@@ -28,8 +28,8 @@ namespace SurvivalEngine
 
         private void Start()
         {
-            if (PlayerData.Get().HasUniqueID(GetTimerUID()))
-                spawn_timer = PlayerData.Get().GetUniqueID(GetTimerUID());
+            if (PlayerData.Get().HasCustomValue(GetTimerUID()))
+                spawn_timer = PlayerData.Get().GetCustomValue(GetTimerUID());
         }
 
         void Update()
@@ -40,7 +40,7 @@ namespace SurvivalEngine
             float game_speed = TheGame.Get().GetGameTimeSpeedPerSec();
             spawn_timer += game_speed * Time.deltaTime;
 
-            PlayerData.Get().SetUniqueID(GetTimerUID(), Mathf.RoundToInt(spawn_timer));
+            PlayerData.Get().SetCustomValue(GetTimerUID(), Mathf.RoundToInt(spawn_timer));
 
             if (spawn_timer > spawn_interval)
             {
@@ -77,10 +77,10 @@ namespace SurvivalEngine
 
         public bool IsFull()
         {
-            return CountObjectsInRadius() >= spawn_max;
+            return CountObjectsInRange() >= spawn_max;
         }
 
-        public int CountObjectsInRadius()
+        public int CountObjectsInRange()
         {
             int count = 0;
             foreach (CraftData data in spawn_data)

@@ -54,6 +54,7 @@ namespace SurvivalEngine
         private Rigidbody rigid;
         private Selectable selectable;
         private Destructible destruct;
+        private Buildable buildable; //Can be null
         private UniqueID unique_id;
         private Collider[] colliders;
         private Vector3 bounds_extent;
@@ -77,6 +78,7 @@ namespace SurvivalEngine
         private bool is_attacking = false;
         private bool is_stuck = false;
         private bool attack_hit = false;
+        private bool direct_move = false;
 
         private bool is_grounded = false;
         private bool is_fronted = false;
@@ -107,6 +109,7 @@ namespace SurvivalEngine
             rigid = GetComponent<Rigidbody>();
             selectable = GetComponent<Selectable>();
             destruct = GetComponent<Destructible>();
+            buildable = GetComponent<Buildable>();
             unique_id = GetComponent<UniqueID>();
             colliders = GetComponentsInChildren<Collider>();
             avoid_side = Random.value < 0.5f ? 1f : -1f;
@@ -117,6 +120,9 @@ namespace SurvivalEngine
             move_target_avoid = transform.position;
 
             selectable.onDestroy += OnDeath;
+
+            if (buildable != null)
+                buildable.onBuild += OnBuild;
 
             foreach (Collider collide in colliders)
             {
@@ -161,7 +167,11 @@ namespace SurvivalEngine
             if (!move_enabled)
                 return;
 
+            if (buildable && buildable.IsBuilding())
+                return;
+
             Vector3 tmove = Vector3.zero;
+            bool is_flying = fall_speed < 0.01f;
 
             if (!IsDead())
             {
@@ -169,7 +179,7 @@ namespace SurvivalEngine
                 move_target_avoid = move_target;
 
                 //Navmesh
-                if (use_navmesh && follow_path && is_moving && path_index < nav_paths.Length)
+                if (use_navmesh && follow_path && !direct_move && is_moving && path_index < nav_paths.Length)
                 {
                     move_target_avoid = nav_paths[path_index];
                     Vector3 dir_total = move_target_avoid - transform.position;
@@ -179,7 +189,7 @@ namespace SurvivalEngine
                 }
 
                 //Navmesh
-                if (use_navmesh && is_moving)
+                if (use_navmesh && is_moving && !direct_move)
                 {
                     Vector3 path_dir = path_destination - transform.position;
                     Vector3 nav_move_dir = move_target - transform.position;
@@ -189,7 +199,7 @@ namespace SurvivalEngine
                 }
 
                 //Avoiding
-                if (is_moving && avoid_obstacles && !use_navmesh && !HasReachedMoveTarget(1f))
+                if (is_moving && !direct_move && avoid_obstacles && !use_navmesh && !HasReachedMoveTarget(1f))
                     move_target_avoid = FindAvoidMoveTarget(move_target);
 
                 //Moving
@@ -213,15 +223,13 @@ namespace SurvivalEngine
                 Quaternion targ_rot = Quaternion.LookRotation(facing, Vector3.up);
                 Quaternion nrot = Quaternion.RotateTowards(rigid.rotation, targ_rot, rotate_speed * Time.fixedDeltaTime);
                 rigid.MoveRotation(nrot);
+
+                //Slope climbing
+                float slope_angle = Vector3.Angle(ground_normal, Vector3.up);
+                bool up_hill = Vector3.Dot(transform.forward, ground_normal) < -0.1f; //Climbing up
+                if (up_hill && !is_flying && slope_angle > slope_angle_max)
+                    tmove = Vector3.zero; // Slope too high
             }
-
-            bool is_flying = fall_speed < 0.01f;
-
-            //Slope climbing
-            float slope_angle = Vector3.Angle(ground_normal, Vector3.up);
-            bool up_hill = Vector3.Dot(transform.forward, ground_normal) < -0.1f; //Climbing up
-            if (up_hill && !is_flying && slope_angle > slope_angle_max )
-                tmove = Vector3.zero; // Slope too high
 
             //Falling
             if (!is_grounded && !is_flying)
@@ -240,8 +248,8 @@ namespace SurvivalEngine
                 grounded_dist_average = Mathf.MoveTowards(grounded_dist_average, grounded_dist, 5f * Time.fixedDeltaTime);
 
             //Adjust ground
-            if (is_grounded && grounded_dist_average > 0.01f)
-                transform.position = Vector3.MoveTowards(transform.position, transform.position + Vector3.up * grounded_dist, 1f * Time.fixedDeltaTime);
+            //if (is_grounded && grounded_dist_average > grounded_dist)
+            //    transform.position = Vector3.MoveTowards(transform.position, transform.position + Vector3.up * grounded_dist, 1f * Time.fixedDeltaTime);
 
             moving = Vector3.Lerp(moving, tmove, 10f * Time.fixedDeltaTime);
             rigid.velocity = moving;
@@ -259,6 +267,9 @@ namespace SurvivalEngine
                 return;
 
             if (IsDead())
+                return;
+
+            if (buildable && buildable.IsBuilding())
                 return;
 
             attack_timer += Time.deltaTime;
@@ -303,14 +314,14 @@ namespace SurvivalEngine
                         move_target = target.transform.position;
 
                         //Stop following
-                        if (attack_target != null && targ_dir.magnitude < GetAttackTargetHitRange() * 0.8f)
+                        if ((attack_target != null || attack_player != null) && targ_dir.magnitude < GetAttackTargetHitRange() * 0.8f)
                         {
                             move_target = transform.position;
                             is_moving = false;
                         }
 
                         //Stop following
-                        if (attack_target == null && HasReachedMoveTarget(follow_distance))
+                        if (attack_target == null && attack_player == null && HasReachedMoveTarget(follow_distance))
                         {
                             move_target = transform.position;
                             is_moving = false;
@@ -394,7 +405,7 @@ namespace SurvivalEngine
             }
 
             //Add an offset to escape path when fronted
-            if (avoid_obstacles)
+            if (avoid_obstacles && !direct_move)
             {
                 if (is_fronted_left && !is_fronted_right)
                     avoid_side = 1f;
@@ -428,7 +439,27 @@ namespace SurvivalEngine
             is_escaping = false;
             is_moving = true;
             move_timer = 0f;
+            direct_move = false;
             CalculateNavmesh();
+        }
+
+        //Meant to be called every frame, for this reason don't do navmesh
+        public void DirectMoveTo(Vector3 pos)
+        {
+            move_target = pos;
+            move_target_avoid = pos;
+            target = null;
+            attack_target = null;
+            attack_player = null;
+            is_escaping = false;
+            is_moving = true;
+            direct_move = true;
+            move_timer = 0f;
+        }
+
+        public void DirectMoveToward(Vector3 dir)
+        {
+            DirectMoveTo(transform.position + dir.normalized);
         }
 
         public void Follow(GameObject target)
@@ -442,6 +473,7 @@ namespace SurvivalEngine
                 is_escaping = false;
                 is_moving = true;
                 move_timer = 0f;
+                direct_move = false;
                 CalculateNavmesh();
             }
         }
@@ -456,6 +488,7 @@ namespace SurvivalEngine
             is_escaping = true;
             is_moving = true;
             move_timer = 0f;
+            direct_move = false;
         }
 
         public void Attack(Destructible target)
@@ -469,6 +502,7 @@ namespace SurvivalEngine
                 is_escaping = false;
                 is_moving = true;
                 move_timer = 0f;
+                direct_move = false;
                 CalculateNavmesh();
             }
         }
@@ -484,6 +518,7 @@ namespace SurvivalEngine
                 is_escaping = false;
                 is_moving = true;
                 move_timer = 0f;
+                direct_move = false;
                 CalculateNavmesh();
             }
         }
@@ -508,6 +543,7 @@ namespace SurvivalEngine
             is_moving = false;
             is_attacking = false;
             move_timer = 0f;
+            direct_move = false;
         }
 
         public void Kill()
@@ -583,6 +619,15 @@ namespace SurvivalEngine
             is_fronted = is_fronted_center || is_fronted_left || is_fronted_right;
         }
 
+        private void OnBuild()
+        {
+            if (data != null)
+            {
+                TrainedCharacterData cdata = PlayerData.Get().AddCharacter(data.id, SceneNav.GetCurrentScene(), transform.position, transform.rotation);
+                unique_id.unique_id = cdata.uid;
+            }
+        }
+
         private void OnDeath()
         {
             rigid.velocity = Vector3.zero;
@@ -590,6 +635,7 @@ namespace SurvivalEngine
             rigid.isKinematic = true;
             target = null;
             attack_target = null;
+            attack_player = null;
             move_target = transform.position;
             is_moving = false;
 
@@ -665,10 +711,17 @@ namespace SurvivalEngine
             return destruct.IsDead();
         }
 
+        //Is actually moving
         public bool IsMoving()
         {
             Vector3 moveXZ = new Vector3(moving.x, 0f, moving.z);
             return is_moving && moveXZ.magnitude > 0.2f;
+        }
+
+        //Order to move given
+        public bool IsTryMoving()
+        {
+            return is_moving;
         }
 
         public Vector3 GetMove()
@@ -716,6 +769,13 @@ namespace SurvivalEngine
             return unique_id.unique_id;
         }
 
+        public bool HasGroup(GroupData group)
+        {
+            if (data != null)
+                return data.HasGroup(group) || selectable.HasGroup(group);
+            return selectable.HasGroup(group);
+        }
+
         public Selectable GetSelectable()
         {
             return selectable;
@@ -724,6 +784,11 @@ namespace SurvivalEngine
         public Destructible GetDestructible()
         {
             return destruct;
+        }
+
+        public Buildable GetBuildable()
+        {
+            return buildable; //Can be null
         }
 
         public TrainedCharacterData SaveData
@@ -824,17 +889,21 @@ namespace SurvivalEngine
             return null;
         }
 
+        //Create a totally new one that will be added to save file, but only after constructed by the player
+        public static Character CreateBuildMode(CharacterData data, Vector3 pos)
+        {
+            GameObject build = Instantiate(data.character_prefab, pos, data.character_prefab.transform.rotation);
+            Character character = build.GetComponent<Character>();
+            character.data = data;
+            character.was_spawned = true;
+            return character;
+        }
+
         //Create a totally new one that will be added to save file
         public static Character Create(CharacterData data, Vector3 pos)
         {
-            return Create(data, pos, null); //Owned by nature/npc
-        }
-
-        public static Character Create(CharacterData data, Vector3 pos, PlayerCharacter owner)
-        {
             Quaternion rot = Quaternion.Euler(0f, 180f, 0f);
-            int pid = owner != null ? owner.player_id : -1;
-            TrainedCharacterData ditem = PlayerData.Get().AddCharacter(data.id, SceneNav.GetCurrentScene(), pid, pos, rot);
+            TrainedCharacterData ditem = PlayerData.Get().AddCharacter(data.id, SceneNav.GetCurrentScene(), pos, rot);
             GameObject build = Instantiate(data.character_prefab, pos, rot);
             Character unit = build.GetComponent<Character>();
             unit.data = data;
@@ -843,9 +912,9 @@ namespace SurvivalEngine
             return unit;
         }
 
-        public static Character Create(CharacterData data, Vector3 pos, Quaternion rot, PlayerCharacter owner = null)
+        public static Character Create(CharacterData data, Vector3 pos, Quaternion rot)
         {
-            Character unit = Create(data, pos, owner);
+            Character unit = Create(data, pos);
             unit.transform.rotation = rot;
             return unit;
         }
