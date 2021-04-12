@@ -202,6 +202,24 @@ namespace SurvivalEngine
             }
         }
 
+        public void CraftCharacterBuildMode(CharacterData item, bool pay_craft_cost = true, UnityAction<Buildable> callback = null)
+        {
+            if (!pay_craft_cost || CanCraft(item))
+            {
+                CancelCrafting();
+
+                Character acharacter = Character.CreateBuildMode(item, transform.position + transform.forward * 1f);
+                current_buildable = acharacter.GetBuildable();
+				if(current_buildable != null)
+					current_buildable.StartBuild(character);
+                current_build_data = item;
+                clicked_build = false;
+                build_pay_cost = pay_craft_cost;
+                build_callback = callback;
+                build_timer = 0f;
+            }
+        }
+
         //Start crafting with timer
         public void StartCrafting(CraftData data)
         {
@@ -345,7 +363,7 @@ namespace SurvivalEngine
                     PayCraftingCost(character);
 
                 Vector3 pos = transform.position + transform.forward * 0.8f;
-                Character acharacter = Character.Create(character, pos, this.character);
+                Character acharacter = Character.Create(character, pos);
 
                 this.character.Data.AddCraftCount(character.id);
 
@@ -365,7 +383,7 @@ namespace SurvivalEngine
                     PayCraftingCost(plant);
 
                 Vector3 pos = transform.position + transform.forward * 0.4f;
-                Plant aplant = Plant.Create(plant, pos, stage, character);
+                Plant aplant = Plant.Create(plant, pos, stage);
 
                 character.Data.AddCraftCount(plant.id);
 
@@ -385,7 +403,7 @@ namespace SurvivalEngine
                     PayCraftingCost(construct);
 
                 Vector3 pos = transform.position + transform.forward * 1f;
-                Construction aconstruct = Construction.Create(construct, pos, character);
+                Construction aconstruct = Construction.Create(construct, pos);
 
                 character.Data.AddCraftCount(construct.id);
 
@@ -422,7 +440,7 @@ namespace SurvivalEngine
                         PayCraftingCost(item);
 
                     Buildable buildable = current_buildable;
-                    buildable.FinishBuild(character);
+                    buildable.FinishBuild();
 
                     character.Data.AddCraftCount(item.id);
 
@@ -431,7 +449,7 @@ namespace SurvivalEngine
                     current_build_data = null;
                     build_callback = null;
                     clicked_build = false;
-                    character.StopAutoAction();
+                    character.StopAutoMove();
 
                     PlayerUI.Get(character.player_id)?.CancelSelection();
                     TheAudio.Get().PlaySFX("craft", buildable.build_audio);

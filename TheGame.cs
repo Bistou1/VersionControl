@@ -27,6 +27,7 @@ namespace SurvivalEngine
         private bool paused_by_player = false;
         private float death_timer = 0f;
         private float speed_multiplier = 1f;
+        private bool scene_transition = false;
 
         private static TheGame _instance;
 
@@ -38,37 +39,7 @@ namespace SurvivalEngine
 
         private void Start()
         {
-            //Load game data
             PlayerData pdata = PlayerData.Get();
-            if (!string.IsNullOrEmpty(pdata.current_scene) && pdata.current_scene == SceneNav.GetCurrentScene())
-            {
-                foreach (PlayerCharacter player in PlayerCharacter.GetAll())
-                {
-                    //Entry index: -1 = go to saved pos, 0=dont change character pos, 1+ = go to entry index
-                    if (pdata.current_entry_index < 0)
-                    {
-                        player.transform.position = player.Data.position;
-                        TheCamera.Get().MoveToTarget(player.Data.position);
-                    }
-
-                    if (pdata.current_entry_index > 0)
-                    {
-                        ExitZone zone = ExitZone.GetIndex(pdata.current_entry_index);
-                        if (zone != null)
-                        {
-                            Vector3 pos = zone.transform.position + zone.entry_offset;
-                            Vector3 dir = new Vector3(zone.entry_offset.x, 0f, zone.entry_offset.z);
-                            player.transform.position = pos;
-                            if (dir.magnitude > 0.1f)
-                                player.transform.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
-                            TheCamera.Get().MoveToTarget(pos);
-                        }
-                    }
-                }
-            }
-
-            pdata.current_scene = SceneNav.GetCurrentScene();
-
             GameObject spawn_parent = new GameObject("SaveFileSpawns");
 
             //Spawn dropped items
@@ -95,16 +66,52 @@ namespace SurvivalEngine
                 Character.Spawn(elem.Key, spawn_parent.transform);
             }
 
+            //Set player and camera position
+            if (!string.IsNullOrEmpty(pdata.current_scene) && pdata.current_scene == SceneNav.GetCurrentScene())
+            {
+                foreach (PlayerCharacter player in PlayerCharacter.GetAll())
+                {
+                    //Entry index: -1 = go to saved pos, 0=dont change character pos, 1+ = go to entry index
+                    if (pdata.current_entry_index < 0)
+                    {
+                        player.transform.position = player.Data.position;
+                        TheCamera.Get().MoveToTarget(player.Data.position);
+                    }
+
+                    if (pdata.current_entry_index > 0)
+                    {
+                        ExitZone zone = ExitZone.GetIndex(pdata.current_entry_index);
+                        if (zone != null)
+                        {
+                            Vector3 pos = zone.transform.position + zone.entry_offset;
+                            Vector3 dir = new Vector3(zone.entry_offset.x, 0f, zone.entry_offset.z);
+                            player.transform.position = pos;
+                            if (dir.magnitude > 0.1f)
+                            {
+                                player.transform.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
+                                player.FaceTorward(transform.position + dir.normalized);
+                            }
+                            TheCamera.Get().MoveToTarget(pos);
+                        }
+                    }
+                }
+            }
+
+            //Set current scene
+            pdata.current_scene = SceneNav.GetCurrentScene();
+
+            //Black panel transition
             if (!BlackPanel.Get().IsVisible())
             {
                 BlackPanel.Get().Show(true);
                 BlackPanel.Get().Hide();
             }
 
-            if (pdata.IsNewGame() && onStartNewGame != null)
+            //New game
+            if (pdata.IsNewGame())
             {
                 pdata.play_time = 0.01f; //Initialize play time to 0.01f to make sure onStartNewGame never get called again
-                onStartNewGame.Invoke(); //New Game!
+                onStartNewGame?.Invoke(); //New Game!
             }
         }
 
@@ -321,6 +328,29 @@ namespace SurvivalEngine
 
         //-- Scene transition -----
 
+        public void TransitionToScene(string scene, int entry_index)
+        {
+            if (!scene_transition)
+            {
+                if (SceneNav.DoSceneExist(scene))
+                {
+                    scene_transition = true;
+                    StartCoroutine(GoToSceneRoutine(scene, entry_index));
+                }
+                else
+                {
+                    Debug.Log("Scene don't exist: " + scene);
+                }
+            }
+        }
+
+        private IEnumerator GoToSceneRoutine(string scene, int entry_index)
+        {
+            BlackPanel.Get().Show();
+            yield return new WaitForSeconds(1f);
+            TheGame.GoToScene(scene, entry_index);
+        }
+
         public static void GoToScene(string scene, int entry_index = 0)
         {
             if (!string.IsNullOrEmpty(scene)) {
@@ -404,21 +434,28 @@ namespace SurvivalEngine
             return true;
         }
 
+        public static void DeleteGame(string filename)
+        {
+            PlayerData.Delete(filename);
+        }
+
         //---------
 
         public static bool IsMobile()
         {
-#if UNITY_ANDROID || UNITY_IOS
-        return true;
+#if UNITY_ANDROID || UNITY_IOS || UNITY_TIZEN
+            return true;
 #elif UNITY_WEBGL
-        return WebGLTool.isMobile();
+            return WebGLTool.isMobile();
 #else
-        return false;
+            return false;
 #endif
         }
 
         public static TheGame Get()
         {
+            if (_instance == null)
+                _instance = FindObjectOfType<TheGame>();
             return _instance;
         }
     }

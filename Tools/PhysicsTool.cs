@@ -75,6 +75,18 @@ namespace SurvivalEngine
             return is_grounded;
         }
 
+        public static int[] DetectGroundLayers(Vector3 center, float hdist)
+        {
+            Vector3 p1 = center;
+            RaycastHit[] hits = Physics.RaycastAll(p1, Vector3.down, hdist, ~0, QueryTriggerInteraction.Ignore);
+            int[] layers = new int[hits.Length];
+
+            for (int i = 0; i < hits.Length; i++)
+                layers[i] = hits[i].collider.gameObject.layer;
+
+            return layers;
+        }
+
         public static bool FindGroundPosition(Vector3 pos, float max_y, out Vector3 ground_pos)
         {
             return FindGroundPosition(pos, max_y, ~0, out ground_pos); //All layers
@@ -110,13 +122,35 @@ namespace SurvivalEngine
 
         public static bool IsLayerIsInLayerMask(int layer, LayerMask mask)
         {
-            bool is_in_layer = (LayerToLayerMask(layer).value & mask.value) > 0;
+            return (LayerToLayerMask(layer).value & mask.value) > 0;
+        }
+
+        public static bool IsAnyLayerIsInLayerMask(int[] layers, LayerMask mask)
+        {
+            bool is_in_layer = false;
+            for (int i = 0; i < layers.Length; i++)
+                is_in_layer = is_in_layer || IsLayerIsInLayerMask(layers[i], mask);
             return is_in_layer;
         }
 
         public static LayerMask LayerToLayerMask(int layer)
         {
             return (LayerMask) 1 << layer;
+        }
+
+        public static List<int> LayerMaskToLayer(LayerMask mask)
+        {
+            uint bits = (uint)mask.value;
+            List<int> layers = new List<int>();
+            for (int i = 31; bits > 0; i--)
+            {
+                if ((bits >> i) > 0)
+                {
+                    bits = ((bits << 32 - i) >> 32 - i);
+                    layers.Add(i);
+                }
+            }
+            return layers;
         }
     }
 

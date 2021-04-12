@@ -16,10 +16,11 @@ namespace SurvivalEngine
         public bool can_attack = true;
         public int hand_damage = 5;
         public int base_armor = 0;
-        public float attack_range = 1.2f;
-        public float attack_speed = 150f;
-        public float attack_windup = 0.7f;
-        public float attack_windout = 0.7f;
+        public float attack_range = 1.2f; //How far can you attack (melee)
+        public float attack_cooldown = 1f; //Seconds of waiting in between each attack
+        public float attack_windup = 0.7f; //Timing (in secs) between the start of the attack and the hit
+        public float attack_windout = 0.4f; //Timing (in secs) between the hit and the end of the attack
+        public float attack_energy = 1f; //Energy cost to attack
 
         [Header("Audio")]
         public AudioClip hit_sound;
@@ -55,14 +56,16 @@ namespace SurvivalEngine
                 return;
 
             //Attack when target is in range
-            float speed = GetAttackSpeed();
-            attack_timer += speed * Time.deltaTime;
+            if(!character.IsDoingAction())
+                attack_timer += Time.deltaTime;
+
             Destructible auto_move_attack = character.GetAutoAttackTarget();
             if (auto_move_attack != null && !character.IsDoingAction() && IsAttackTargetInRange(auto_move_attack))
             {
                 character.FaceTorward(auto_move_attack.transform.position);
+                character.PauseAutoMove(); //Reached target, dont keep moving
 
-                if (attack_timer > 100f)
+                if (attack_timer > GetAttackCooldown())
                 {
                     DoAttack(auto_move_attack);
                 }
@@ -275,7 +278,7 @@ namespace SurvivalEngine
         //Can it be attacked at all?
         public bool CanAttack(Destructible target)
         {
-            return can_attack && target != null && target.CanBeAttacked()
+            return can_attack && target != null && target.CanBeAttacked() 
                 && (target.required_item != null || target.attack_group != AttackGroup.Ally) //Cant attack allied unless has required item
                 && (target.required_item == null || character.EquipData.HasItemInGroup(target.required_item)); //Cannot attack unless has equipped item
         }
@@ -288,7 +291,8 @@ namespace SurvivalEngine
             if (equipped != null && CanWeaponHitTarget(target))
                 damage = equipped.damage;
 
-            damage += Mathf.RoundToInt(damage * character.Attributes.GetBonusEffectTotal(BonusType.AttackBoost));
+            float mult = 1f + character.Attributes.GetBonusEffectTotal(BonusType.AttackBoost);
+            damage = Mathf.RoundToInt(damage * mult);
 
             return damage;
         }
@@ -317,12 +321,12 @@ namespace SurvivalEngine
             return 0.01f;
         }
 
-        public float GetAttackSpeed()
+        public float GetAttackCooldown()
         {
             ItemData equipped = character.EquipData.GetEquippedWeaponData();
             if (equipped != null)
-                return equipped.attack_speed;
-            return attack_speed;
+                return equipped.attack_cooldown / character.Attributes.GetAttackMult();
+            return attack_cooldown / character.Attributes.GetAttackMult();
         }
 
         public int GetAttackStrikes()
@@ -344,17 +348,25 @@ namespace SurvivalEngine
         public float GetAttackWindup()
         {
             EquipItem item_equip = character.Inventory.GetEquippedWeaponMesh();
-            if (item_equip != null)
-                return item_equip.attack_windup;
-            return attack_windup;
+            if (item_equip != null && item_equip.override_timing)
+                return item_equip.attack_windup / GetAttackAnimSpeed();
+            return attack_windup / GetAttackAnimSpeed();
         }
 
         public float GetAttackWindout()
         {
             EquipItem item_equip = character.Inventory.GetEquippedWeaponMesh();
-            if (item_equip != null)
-                return item_equip.attack_windout;
-            return attack_windout;
+            if (item_equip != null && item_equip.override_timing)
+                return item_equip.attack_windout / GetAttackAnimSpeed();
+            return attack_windout / GetAttackAnimSpeed();
+        }
+
+        public float GetAttackAnimSpeed()
+        {
+            ItemData equipped = character.EquipData.GetEquippedWeaponData();
+            if (equipped != null && equipped.attack_anim_speed > 0.01f)
+                return equipped.attack_anim_speed * character.Attributes.GetAttackMult();
+            return 1f * character.Attributes.GetAttackMult();
         }
 
         public Vector3 GetProjectileSpawnPos(ItemData weapon)

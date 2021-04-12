@@ -33,6 +33,7 @@ namespace SurvivalEngine
 
         private float using_timer = 1f;
         private float hold_timer = 0f;
+        private float hold_total_timer = 0f;
         private bool is_holding = false;
         private bool has_mouse = false;
         private bool can_long_click = false;
@@ -50,7 +51,7 @@ namespace SurvivalEngine
         private Vector3 prev_touch1 = Vector3.zero;
         private Vector3 prev_touch2 = Vector3.zero;
 
-        private HashSet<GameObject> raycast_list = new HashSet<GameObject>();
+        private HashSet<Selectable> raycast_list = new HashSet<Selectable>();
 
         private static PlayerControlsMouse _instance;
 
@@ -76,6 +77,7 @@ namespace SurvivalEngine
                 is_holding = true;
                 can_long_click = true;
                 hold_timer = 0f;
+                hold_total_timer = 0f;
                 OnMouseClick();
             }
 
@@ -121,6 +123,7 @@ namespace SurvivalEngine
             if (is_holding)
             {
                 hold_timer += Time.deltaTime;
+                hold_total_timer += Time.deltaTime;
                 if (can_long_click && hold_timer > 0.5f)
                 {
                     can_long_click = false;
@@ -196,6 +199,9 @@ namespace SurvivalEngine
         {
             raycast_list.Clear();
 
+            if (TheUI.Get().IsBlockingPanelOpened())
+                return;
+
             PlayerUI ui = PlayerUI.GetFirst();
             if (ui != null && ui.IsBuildMode())
                 return; //Dont hover/select things in build mode
@@ -207,7 +213,7 @@ namespace SurvivalEngine
                 {
                     Selectable select = hit.collider.GetComponentInParent<Selectable>();
                     if (select != null)
-                        raycast_list.Add(select.gameObject);
+                        raycast_list.Add(select);
                 }
             }
         }
@@ -318,10 +324,9 @@ namespace SurvivalEngine
         {
             Selectable nearest = null;
             float min_dist = 99f;
-            foreach (GameObject obj in raycast_list)
+            foreach (Selectable select in raycast_list)
             {
-                Selectable select = obj.GetComponent<Selectable>();
-                if (select != null && select.IsActive())
+                if (select != null && select.CanBeClicked())
                 {
                     float dist = (select.transform.position - pos).magnitude;
                     if (dist < min_dist)
@@ -346,9 +351,9 @@ namespace SurvivalEngine
             return floor_pos;
         }
 
-        public bool IsInRaycast(GameObject obj)
+        public bool IsInRaycast(Selectable select)
         {
-            return raycast_list.Contains(obj);
+            return raycast_list.Contains(select);
         }
 
         //Is there a mouse/touch enabled on this device? (would be false on consoles)
@@ -381,6 +386,11 @@ namespace SurvivalEngine
         public bool IsMouseHoldRight()
         {
             return mouse_hold_right;
+        }
+
+        public float GetMouseHoldDuration()
+        {
+            return hold_total_timer;
         }
 
         public float GetMouseScroll()

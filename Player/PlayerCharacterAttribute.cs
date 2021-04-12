@@ -13,6 +13,8 @@ namespace SurvivalEngine
         private PlayerCharacter character;
 
         private float move_speed_mult = 1f;
+        private float attack_mult = 1f;
+        private bool depleting = false;
 
         private void Awake()
         {
@@ -49,15 +51,20 @@ namespace SurvivalEngine
             }
 
             //Penalty for depleted attributes
-            move_speed_mult = 1f + GetBonusEffectTotal(BonusType.SpeedBoost);
+            move_speed_mult = 1f;
+            attack_mult = 1f;
+            depleting = false;
 
             foreach (AttributeData attr in attributes)
             {
                 if (GetAttributeValue(attr.type) < 0.01f)
                 {
                     move_speed_mult = move_speed_mult * attr.deplete_move_mult;
+                    attack_mult = attack_mult * attr.deplete_attack_mult;
                     float update_value = attr.deplete_hp_loss * game_speed * Time.deltaTime;
                     AddAttribute(AttributeType.Health, update_value);
+                    if (attr.deplete_hp_loss < 0f)
+                        depleting = true;
                 }
             }
 
@@ -149,7 +156,17 @@ namespace SurvivalEngine
 
         public float GetSpeedMult()
         {
-            return move_speed_mult;
+            return Mathf.Max(move_speed_mult, 0.01f);
+        }
+
+        public float GetAttackMult()
+        {
+            return Mathf.Max(attack_mult, 0.01f);
+        }
+
+        public bool IsDepletingHP()
+        {
+            return depleting;
         }
 
         public PlayerCharacterData CharacterData

@@ -14,6 +14,7 @@ namespace SurvivalEngine
     public class PlayerCharacterInventory : MonoBehaviour
     {
         public int inventory_size = 15; //If you change this, make sure to change the UI
+        public ItemData[] starting_items;
 
         public UnityAction<Item> onTakeItem;
         public UnityAction<Item> onDropItem;
@@ -33,7 +34,20 @@ namespace SurvivalEngine
 
         private void Start()
         {
-            InventoryData.size = inventory_size;
+            bool has_inventory = PlayerData.Get().HasInventory(character.player_id);
+
+            InventoryData.size = inventory_size; //This will also create the inventory
+            EquipData.size = 99; //Create the inventory, size doesnt matter for equip
+
+            //If new game, add starting items
+            if (!has_inventory)
+            {
+                InventoryData invdata = InventoryData.Get(InventoryType.Inventory, character.player_id);
+                foreach (ItemData item in starting_items)
+                {
+                    invdata.AddItem(item.id, 1, item.durability, UniqueID.GenerateUniqueID());
+                }
+            }
         }
 
         void Update()
@@ -151,7 +165,7 @@ namespace SurvivalEngine
                 }
                 else
                 {
-                    Item.Create(item, transform.position, quantity);
+                    Item.Create(item, character.GetPosition(), quantity);
                 }
             }
         }
@@ -169,6 +183,9 @@ namespace SurvivalEngine
             if (invdata != null && idata != null)
             {
                 ConstructionData construct = idata.construction_data;
+                PlantData aplant = idata.plant_data;
+                CharacterData acharacter = idata.character_data;
+
                 if (construct != null)
                 {
                     inventory.RemoveItemAt(slot, 1);
@@ -176,9 +193,24 @@ namespace SurvivalEngine
                     BuiltConstructionData constru = PlayerData.Get().GetConstructed(construction.GetUID());
                     if (idata.HasDurability())
                         constru.durability = invdata.durability; //Save durability
-                    PlayerUI.Get(character.player_id)?.CancelSelection();
                     TheAudio.Get().PlaySFX("craft", construction.GetBuildable().build_audio);
                 }
+
+                else if (aplant != null)
+                {
+                    inventory.RemoveItemAt(slot, 1);
+                    Plant plant = character.Crafting.CraftPlant(aplant, 0, false);
+                    TheAudio.Get().PlaySFX("craft", plant.GetBuildable().build_audio);
+                }
+
+                else if (acharacter != null)
+                {
+                    inventory.RemoveItemAt(slot, 1);
+                    Character charact = character.Crafting.CraftCharacter(acharacter, false);
+                    TheAudio.Get().PlaySFX("craft", charact.GetBuildable().build_audio);
+                }
+
+                PlayerUI.Get(character.player_id)?.CancelSelection();
             }
         }
 
@@ -229,7 +261,7 @@ namespace SurvivalEngine
                 if (idata.CanBeDropped())
                 {
                     inventory.RemoveItemAt(slot, invdata.quantity);
-                    Item iitem = Item.Create(idata, transform.position, invdata.quantity, invdata.durability, invdata.uid);
+                    Item iitem = Item.Create(idata, character.GetPosition(), invdata.quantity, invdata.durability, invdata.uid);
 
                     PlayerUI.Get(character.player_id)?.CancelSelection();
 
@@ -515,6 +547,7 @@ namespace SurvivalEngine
                 || (BagData != null && BagData.CanTakeItem(item.id, quantity)));
         }
 
+        //Return the best equipped bag (bag is an item that can contain other items)
         public InventoryItemData GetBestEquippedBag()
         {
             int best_size = 0;
@@ -529,6 +562,21 @@ namespace SurvivalEngine
                 }
             }
             return bag;
+        }
+
+        //Return all equipped bags (bag is an item that can contain other items)
+        public List<InventoryItemData> GetAllEquippedBags()
+        {
+            List<InventoryItemData> bags = new List<InventoryItemData>();
+            foreach (KeyValuePair<int, InventoryItemData> invdata in EquipData.items)
+            {
+                ItemData idata = invdata.Value?.GetItem();
+                if (idata != null && idata.bag_size > 0 && !string.IsNullOrEmpty(invdata.Value.uid))
+                {
+                    bags.Add(invdata.Value);
+                }
+            }
+            return bags;
         }
 
         //Return inventory that can take item (main one first, then bag)

@@ -50,7 +50,7 @@ namespace SurvivalEngine.WorldGen
         
         private void Start()
         {
-            if (mode == WorldGeneratorMode.Runtime)
+            if (mode == WorldGeneratorMode.Runtime && Application.isPlaying)
             {
                 TheGame.Get().PauseScripts();
                 BlackPanel.Get().Show(true);

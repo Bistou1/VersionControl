@@ -24,19 +24,14 @@ namespace SurvivalEngine
         public float move_speed = 4f;
         public float move_accel = 8;
         public float rotate_speed = 180f;
-        public float fall_speed = 20f;
-        public float slope_angle_max = 45f;
-        public float ground_detect_dist = 0.1f;
-        public LayerMask ground_layer = ~0;
+        public float fall_speed = 20f; //Falling speed
+        public float fall_gravity = 40f; //Falling acceleration
+        public float slope_angle_max = 45f; //Maximum angle, in degrees that the character can climb up
+        public float moving_threshold = 0.1f; //Move threshold is how fast the character need to move before its considered movement (triggering animations, etc)
+        public float ground_detect_dist = 0.1f; //Margin distance between the character and the ground, used to detect if character is grounded.
+        public LayerMask ground_layer = ~0; //What is considered ground?
         public bool use_navmesh = false;
 
-        [Header("Jump")]
-        public bool can_jump = false;
-        public float jump_power = 10f;
-        public float jump_gravity = 20f;
-        public float jump_duration = 0.5f;
-
-        public UnityAction onJump;
         public UnityAction<string, float> onTriggerAnim;
 
         private Rigidbody rigid;
@@ -45,12 +40,15 @@ namespace SurvivalEngine
         private PlayerCharacterCombat character_combat;
         private PlayerCharacterCraft character_craft;
         private PlayerCharacterInventory character_inventory;
+        private PlayerCharacterJump character_jump;
+        private PlayerCharacterSwim character_swim;
+        private PlayerCharacterAnim character_anim;
 
         private Vector3 move;
         private Vector3 facing;
         private Vector3 move_average;
         private Vector3 prev_pos;
-        private Vector3 jump_vect;
+        private Vector3 fall_vect;
 
         private bool auto_move = false;
         private Vector3 auto_move_target;
@@ -61,7 +59,6 @@ namespace SurvivalEngine
         private int auto_move_drop = -1;
         private InventoryData auto_move_drop_inventory;
         private float auto_move_timer = 0f;
-        private float jump_timer = 0f;
 
         private Vector3 ground_normal = Vector3.up;
         private bool controls_enabled = true;
@@ -71,7 +68,9 @@ namespace SurvivalEngine
         private bool is_action = false;
         private bool is_sleep = false;
         private bool is_fishing = false;
+        private bool is_riding = false;
 
+        private AnimalRide riding_animal = null;
         private ActionSleep sleep_target = null;
         private Coroutine action_routine = null;
         private GameObject action_progress = null;
@@ -97,9 +96,12 @@ namespace SurvivalEngine
             character_combat = GetComponent<PlayerCharacterCombat>();
             character_craft = GetComponent<PlayerCharacterCraft>();
             character_inventory = GetComponent<PlayerCharacterInventory>();
+            character_jump = GetComponent<PlayerCharacterJump>();
+            character_swim = GetComponent<PlayerCharacterSwim>();
+            character_anim = GetComponent<PlayerCharacterAnim>();
             facing = transform.forward;
             prev_pos = transform.position;
-            jump_vect = Vector3.down * fall_speed;
+            fall_vect = Vector3.down * fall_speed;
         }
 
         private void OnDestroy()
@@ -116,7 +118,7 @@ namespace SurvivalEngine
             mouse_controls.onRightClick += OnRightClick;
             mouse_controls.onHold += OnMouseHold;
             mouse_controls.onRelease += OnMouseRelease;
-
+            
             if (player_id < 0)
                 Debug.LogError("Player ID should be 0 or more: -1 is reserved to indicate neutral (no player)");
         }
@@ -173,11 +175,11 @@ namespace SurvivalEngine
                 Vector3 move_dir = move_dir_next.normalized * Mathf.Min(move_dir_total.magnitude, 1f);
                 move_dir.y = 0f;
 
-                float move_dist = Mathf.Min(move_speed * character_attr.GetSpeedMult(), move_dir.magnitude * 10f);
+                float move_dist = Mathf.Min(GetMoveSpeed(), move_dir.magnitude * 10f);
                 tmove = move_dir.normalized * move_dist;
             }
             //Keyboard/gamepad moving
-            else if(controls_enabled)
+            else if(IsControlsEnabled())
             {
                 Vector3 cam_move = TheCamera.Get().GetRotation() * controls.GetMove();
                 if (mcontrols.IsJoystickActive() && !character_craft.IsBuildMode())
@@ -185,7 +187,7 @@ namespace SurvivalEngine
                     Vector2 joystick = mcontrols.GetJoystickDir();
                     cam_move = TheCamera.Get().GetRotation() * new Vector3(joystick.x, 0f, joystick.y);
                 }
-                tmove = cam_move * move_speed * character_attr.GetSpeedMult();
+                tmove = cam_move * GetMoveSpeed();
             }
 
             //CancelAction
@@ -200,11 +202,11 @@ namespace SurvivalEngine
             DetectGrounded();
 
             //Add Falling to the move vector
-            if (!is_grounded || jump_timer > 0f)
+            if (!is_grounded || IsJumping())
             {
-                if (jump_timer <= 0f)
-                    jump_vect = Vector3.MoveTowards(jump_vect, Vector3.down * fall_speed, jump_gravity * Time.fixedDeltaTime);
-                tmove += jump_vect;
+                if (!IsJumping())
+                    fall_vect = Vector3.MoveTowards(fall_vect, Vector3.down * fall_speed, fall_gravity * Time.fixedDeltaTime);
+                tmove += fall_vect;
             }
             //Add slope angle
             else if(is_grounded)
@@ -251,7 +253,7 @@ namespace SurvivalEngine
 
             //Stop the click auto move when moving with keyboard/joystick/gamepad
             if (controls.IsMoving() || mcontrols.IsJoystickActive() || mcontrols.IsDoubleTouch())
-                StopAutoAction();
+                StopAutoMove();
         }
 
         private void Update()
@@ -263,11 +265,10 @@ namespace SurvivalEngine
                 return;
 
             //Save position
-            Data.position = transform.position;
+            Data.position = GetPosition();
 
             //Controls
             PlayerControls controls = PlayerControls.Get(player_id);
-            jump_timer -= Time.deltaTime;
 
             //Stop sleep
             if (is_action || IsMoving() || sleep_target == null)
@@ -301,8 +302,21 @@ namespace SurvivalEngine
             if (!character_combat.CanAttack(auto_move_attack))
                 auto_move_attack = null;
 
+            //Ride animal
+            if (is_riding)
+            {
+                if (riding_animal == null || riding_animal.IsDead())
+                {
+                    StopRide();
+                    return;
+                }
+
+                transform.position = riding_animal.GetRideRoot();
+                transform.rotation = Quaternion.LookRotation(riding_animal.transform.forward, Vector3.up);
+            }
+
             //Controls
-            if (controls_enabled && !is_action) {
+            if (IsControlsEnabled() && !is_action) {
 
                 //Check if panel is focused
                 KeyControlsUI ui_controls = KeyControlsUI.Get(player_id);
@@ -329,9 +343,9 @@ namespace SurvivalEngine
                     }
 
                     //Press jump
-                    if (can_jump && controls.IsPressJump())
+                    if (character_jump != null && controls.IsPressJump())
                     {
-                        Jump();
+                        character_jump.Jump();
                     }
                 }
 
@@ -343,14 +357,17 @@ namespace SurvivalEngine
                     }
                 }
             }
+
+            //Stop riding
+            if (is_riding && (controls.IsPressJump() || controls.IsPressAction() || controls.IsPressUICancel()))
+                StopRide();
         }
 
         //Detect if character is on the floor
         private void DetectGrounded()
         {
-            Vector3 scale = transform.lossyScale;
-            float hradius = collide.height * scale.y * 0.5f + ground_detect_dist; //radius is half the height minus offset
-            float radius = collide.radius * (scale.x + scale.y) * 0.5f;
+            float hradius = GetColliderHeightRadius();
+            float radius = GetColliderRadius();
             Vector3 center = GetColliderCenter();
 
             float gdist; Vector3 gnormal;
@@ -453,7 +470,7 @@ namespace SurvivalEngine
 
         public void Sleep(ActionSleep sleep_target)
         {
-            if (!is_sleep)
+            if (!is_sleep && !is_riding && !IsSwimming())
             {
                 this.sleep_target = sleep_target;
                 is_sleep = true;
@@ -476,7 +493,7 @@ namespace SurvivalEngine
         //Fish item from a fishing spot
         public void FishItem(ItemProvider source, int quantity)
         {
-            if (source != null && source.HasItem() && character_inventory.CanTakeItem(source.item, quantity))
+            if (source != null && source.HasItem())
             {
                 is_fishing = true;
 
@@ -507,22 +524,10 @@ namespace SurvivalEngine
             if (is_fishing)
             {
                 source.RemoveItem();
-                character_inventory.GainItem(source.item, quantity);
+                source.GainItem(this, quantity);
             }
 
             is_fishing = false;
-        }
-
-        public void Jump()
-        {
-            if (!IsJumping() && is_grounded)
-            {
-                jump_vect = Vector3.up * jump_power;
-                jump_timer = jump_duration;
-
-                if (onJump != null)
-                    onJump.Invoke();
-            }
         }
 
         //----- Player Orders ----------
@@ -636,18 +641,68 @@ namespace SurvivalEngine
             }
         }
 
+        public void RideNearest()
+        {
+            AnimalRide animal = AnimalRide.GetNearest(transform.position, 2f);
+            RideAnimal(animal);
+        }
+
+        public void RideAnimal(AnimalRide animal)
+        {
+            if (!is_riding && animal != null)
+            {
+                is_riding = true;
+                is_action = true;
+                collide.enabled = false;
+                riding_animal = animal;
+                transform.position = animal.GetRideRoot();
+                animal.SetRider(this);
+            }
+        }
+
+        public void StopRide()
+        {
+            if (is_riding)
+            {
+                if (riding_animal != null)
+                    riding_animal.StopRide();
+                is_riding = false;
+                is_action = false;
+                collide.enabled = true;
+                riding_animal = null;
+            }
+        }
+
         public void StopMove()
         {
-            StopAutoAction();
+            StopAutoMove();
             move = Vector3.zero;
             rigid.velocity = Vector3.zero;
         }
 
-        public void StopAutoAction()
+        public void StopAutoMove()
         {
             auto_move = false;
             auto_move_select = null;
             auto_move_attack = null;
+            auto_move_drop_inventory = null;
+        }
+
+        //Temporary pause auto move to be resumed (but keep its target)
+        public void PauseAutoMove()
+        {
+            auto_move = false;
+        }
+
+        public void ResumeAutoMove()
+        {
+            if (auto_move_select != null || auto_move_attack != null)
+                auto_move = true;
+        }
+
+        public void SetFallVect(Vector3 fall)
+        {
+            fall_vect = fall;
         }
 
         public void Kill()
@@ -663,7 +718,7 @@ namespace SurvivalEngine
         public void DisableControls()
         {
             controls_enabled = false;
-            StopAutoAction();
+            StopAutoMove();
         }
 
         //------- Mouse Clicks --------
@@ -689,6 +744,11 @@ namespace SurvivalEngine
 
             if (TheGame.IsMobile())
                 return; //On mobile, use joystick instead, no mouse hold
+
+            //Stop auto target if holding
+            PlayerControlsMouse mcontrols = PlayerControlsMouse.Get();
+            if (auto_move && mcontrols.GetMouseHoldDuration() > 1f)
+                StopAutoMove();
 
             //Only hold for normal movement, if interacting dont change while holding
             if (character_craft.GetCurrentBuildable() == null && auto_move_select == null && auto_move_attack == null)
@@ -805,6 +865,16 @@ namespace SurvivalEngine
             return auto_move_attack;
         }
 
+        public InventoryData GetAutoDropInventory()
+        {
+            return auto_move_drop_inventory;
+        }
+
+        public Selectable GetAutoSelectTarget()
+        {
+            return auto_move_select;
+        }
+
         public bool IsDead()
         {
             return character_combat.IsDead();
@@ -820,6 +890,16 @@ namespace SurvivalEngine
             return is_fishing;
         }
 
+        public bool IsRiding()
+        {
+            return is_riding;
+        }
+
+        public bool IsSwimming()
+        {
+            return character_swim != null && character_swim.IsSwimming();
+        }
+
         public bool IsDoingAction()
         {
             return is_action;
@@ -827,13 +907,21 @@ namespace SurvivalEngine
 
         public bool IsJumping()
         {
-            return jump_timer > 0f;
+            return character_jump != null && character_jump.IsJumping();
+        }
+
+        public bool IsAutoMove()
+        {
+            return auto_move;
         }
 
         public bool IsMoving()
         {
+            if (is_riding && riding_animal != null)
+                return riding_animal.IsMoving();
+
             Vector3 moveXZ = new Vector3(move.x, 0f, move.z);
-            return moveXZ.magnitude > move_speed * character_attr.GetSpeedMult() * 0.1f;
+            return moveXZ.magnitude > GetMoveSpeed() * moving_threshold;
         }
 
         public Vector3 GetMove()
@@ -846,10 +934,36 @@ namespace SurvivalEngine
             return facing;
         }
 
+        public float GetMoveSpeed()
+        {
+            float boost = 1f + character_attr.GetBonusEffectTotal(BonusType.SpeedBoost);
+            float base_speed = IsSwimming() ? character_swim.swim_speed : move_speed;
+            return base_speed * boost * character_attr.GetSpeedMult();
+        }
+
+        public Vector3 GetPosition()
+        {
+            if (is_riding && riding_animal != null)
+                return riding_animal.transform.position;
+            return transform.position;
+        }
+
         public Vector3 GetColliderCenter()
         {
             Vector3 scale = transform.lossyScale;
             return collide.transform.position + Vector3.Scale(collide.center, scale);
+        }
+
+        public float GetColliderHeightRadius()
+        {
+            Vector3 scale = transform.lossyScale;
+            return collide.height * scale.y * 0.5f + ground_detect_dist; //radius is half the height minus offset
+        }
+
+        public float GetColliderRadius()
+        {
+            Vector3 scale = transform.lossyScale;
+            return collide.radius * (scale.x + scale.y) * 0.5f;
         }
 
         public bool IsFronted()
@@ -864,7 +978,7 @@ namespace SurvivalEngine
 
         public bool IsControlsEnabled()
         {
-            return controls_enabled;
+            return controls_enabled && !TheUI.Get().IsFullPanelOpened();
         }
 
         public PlayerCharacterCombat Combat
@@ -887,6 +1001,21 @@ namespace SurvivalEngine
             get { return character_inventory; }
         }
 
+        public PlayerCharacterJump Jumping
+        {
+            get { return character_jump; } //Can be null
+        }
+
+        public PlayerCharacterSwim Swimming
+        {
+            get { return character_swim; } //Can be null
+        }
+
+        public PlayerCharacterAnim Animation
+        {
+            get { return character_anim; } //Can be null
+        }
+
         public PlayerCharacterData Data //Keep for compatibility with other versions, same than SaveData
         {
             get { return PlayerCharacterData.Get(player_id); }
@@ -905,6 +1034,22 @@ namespace SurvivalEngine
         public InventoryData EquipData
         {
             get { return character_inventory.EquipData; }
+        }
+
+        public static PlayerCharacter GetNearest(Vector3 pos, float range = 999f)
+        {
+            PlayerCharacter nearest = null;
+            float min_dist = range;
+            foreach (PlayerCharacter unit in players_list)
+            {
+                float dist = (unit.transform.position - pos).magnitude;
+                if (dist < min_dist)
+                {
+                    min_dist = dist;
+                    nearest = unit;
+                }
+            }
+            return nearest;
         }
 
         public static PlayerCharacter GetFirst()

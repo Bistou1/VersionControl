@@ -76,7 +76,7 @@ namespace SurvivalEngine.WorldGen
             fcollider.transform.SetParent(floor.transform);
             fcollider.transform.position = floor.transform.position;
             fcollider.isStatic = true;
-            fcollider.layer = floor.layer;
+            fcollider.layer = 14; //Water wall layer
 
             MeshRenderer crender = fcollider.AddComponent<MeshRenderer>();
             MeshFilter cmesh = fcollider.AddComponent<MeshFilter>();

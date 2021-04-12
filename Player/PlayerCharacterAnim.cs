@@ -16,6 +16,7 @@ namespace SurvivalEngine
         public string move_side_x = "MoveX";
         public string move_side_z = "MoveZ";
         public string attack_anim = "Attack";
+        public string attack_speed = "AttackSpeed";
         public string take_anim = "Take";
         public string craft_anim = "Craft";
         public string build_anim = "Build";
@@ -25,15 +26,15 @@ namespace SurvivalEngine
         public string fish_anim = "Fish";
         public string dig_anim = "Dig";
         public string water_anim = "Water";
+        public string hoe_anim = "Hoe";
+        public string ride_anim = "Ride";
+        public string swim_anim = "Swim";
 
         private PlayerCharacter character;
         private Animator animator;
 
-        private static PlayerCharacterAnim _instance;
-
         void Awake()
         {
-            _instance = this;
             character = GetComponent<PlayerCharacter>();
             animator = GetComponentInChildren<Animator>();
 
@@ -51,8 +52,10 @@ namespace SurvivalEngine
             character.Combat.onAttackHit += OnAttackHit;
             character.Combat.onDamaged += OnDamaged;
             character.Combat.onDeath += OnDeath;
-            character.onJump += OnJump;
             character.onTriggerAnim += OnTriggerAnim;
+
+            if (character.Jumping)
+                character.Jumping.onJump += OnJump;
         }
 
         void Update()
@@ -67,6 +70,8 @@ namespace SurvivalEngine
                 animator.SetBool(craft_anim, !gameplay_paused && character.Crafting.IsCrafting());
                 animator.SetBool(sleep_anim, character.IsSleeping());
                 animator.SetBool(fish_anim, character.IsFishing());
+                animator.SetBool(ride_anim, character.IsRiding());
+                animator.SetBool(swim_anim, character.IsSwimming());
 
                 float mangle = Vector3.SignedAngle(character.GetFacing(), character.GetMove(), Vector3.up);
                 Vector3 move_side = new Vector3(Mathf.Sin(mangle * Mathf.Deg2Rad), 0f, Mathf.Cos(mangle * Mathf.Deg2Rad));
@@ -113,6 +118,7 @@ namespace SurvivalEngine
         private void OnAttack(Destructible target, bool ranged)
         {
             string anim = attack_anim;
+            float anim_speed = character.Combat.GetAttackAnimSpeed();
 
             //Replace anim based on current equipped item
             EquipItem equip = character.Inventory.GetEquippedWeaponMesh();
@@ -124,6 +130,7 @@ namespace SurvivalEngine
                     anim = equip.attack_ranged_anim;
             }
 
+            animator.SetFloat(attack_speed, anim_speed);
             animator.SetTrigger(anim);
         }
 
@@ -136,11 +143,6 @@ namespace SurvivalEngine
         {
             if(!string.IsNullOrEmpty(anim))
                 animator.SetTrigger(anim);
-        }
-
-        public static PlayerCharacterAnim Get()
-        {
-            return _instance;
         }
     }
 

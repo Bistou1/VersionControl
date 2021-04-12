@@ -166,6 +166,11 @@ namespace SurvivalEngine
             return caudio;
         }
 
+        //Shortcuts
+        public static void Music(string channel, AudioClip audio, float volume = 1f) { _instance?.PlayMusic(channel, audio, volume); }
+        public static void SFX(string channel, AudioClip audio, float volume = 1f) { _instance?.PlaySFX(channel, audio, volume); }
+        public static void Stop(string channel) { _instance?.StopMusic(channel); } //Stops music
+
         public static TheAudio Get()
         {
             return _instance;
