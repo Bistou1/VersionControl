@@ -36,6 +36,8 @@ namespace SurvivalEngine
 
         public static TheData Get()
         {
+            if (_instance == null)
+                _instance = FindObjectOfType<TheData>();
             return _instance;
         }
     }

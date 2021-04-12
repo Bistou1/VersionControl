@@ -55,17 +55,17 @@ namespace SurvivalEngine
 
         public void SetValue(int value)
         {
-            PlayerData.Get().SetUniqueID(unique_id, value);
+            PlayerData.Get().SetCustomValue(unique_id, value);
         }
 
         public int GetValue()
         {
-            return PlayerData.Get().GetUniqueID(unique_id);
+            return PlayerData.Get().GetCustomValue(unique_id);
         }
 
         public bool HasValue()
         {
-            return PlayerData.Get().HasUniqueID(unique_id);
+            return PlayerData.Get().HasCustomValue(unique_id);
         }
 
         public bool HasUID()

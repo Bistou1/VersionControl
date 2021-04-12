@@ -18,8 +18,11 @@ namespace SurvivalEngine
         HungerUp = 11, //Value in amount per game-hour
         ThirstUp = 12, //Value in amount per game-hour
         HappyUp = 13, //Value in amount per game-hour
+        EnergyUp = 14, //Value in amount per game-hour
 
         Invulnerable = 20, //In percentage, so 0.5 is half damage, 1 is no damage
+
+        ColdResist=30, //Add cold resistance
 
     }
 
@@ -45,6 +48,8 @@ namespace SurvivalEngine
                 return BonusType.ThirstUp;
             if (type == AttributeType.Happiness)
                 return BonusType.HappyUp;
+            if (type == AttributeType.Energy)
+                return BonusType.EnergyUp;
             return BonusType.None;
         }
     }

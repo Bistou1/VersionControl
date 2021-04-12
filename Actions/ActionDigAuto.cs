@@ -18,7 +18,7 @@ namespace SurvivalEngine
             DigSpot spot = select.GetComponent<DigSpot>();
             if (spot != null)
             {
-                string animation = PlayerCharacterAnim.Get() ? PlayerCharacterAnim.Get().dig_anim : "";
+                string animation = character.Animation ? character.Animation.dig_anim : "";
                 character.TriggerAnim(animation, spot.transform.position);
                 character.TriggerProgressAction(1.5f, () =>
                 {

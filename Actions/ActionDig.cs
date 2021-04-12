@@ -22,7 +22,7 @@ namespace SurvivalEngine
             if (spot != null)
                 pos = spot.transform.position;
 
-            string animation = PlayerCharacterAnim.Get() ? PlayerCharacterAnim.Get().dig_anim : "";
+            string animation = character.Animation ? character.Animation.dig_anim : "";
             character.TriggerAnim(animation, pos);
             character.TriggerProgressAction(1.5f, () =>
             {
@@ -39,7 +39,7 @@ namespace SurvivalEngine
 
         public override bool CanDoAction(PlayerCharacter character, ItemSlot slot)
         {
-            return slot.type == SlotType.Equipment;
+            return slot is EquipSlotUI;
         }
     }
 

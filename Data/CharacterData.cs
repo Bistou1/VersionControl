@@ -15,6 +15,9 @@ namespace SurvivalEngine
 
         public GameObject character_prefab; //Prefab spawned when the character is built
 
+        [Header("Ref Data")]
+        public ItemData take_item_data;
+
         private static List<CharacterData> character_data = new List<CharacterData>();
 
         public static void Load(string characters_folder)

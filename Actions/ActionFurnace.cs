@@ -12,6 +12,7 @@ namespace SurvivalEngine
     public class ActionFurnace : MAction
     {
         public ItemData melt_item;
+        public int melt_item_quantity = 1;
         public float duration = 1f; //In game hours
 
         //Merge action
@@ -19,11 +20,14 @@ namespace SurvivalEngine
         {
             InventoryData inventory = slot.GetInventory();
             InventoryItemData iidata = inventory.GetItem(slot.index);
-            inventory.RemoveItemAt(slot.index, iidata.quantity);
 
             Furnace furnace = select.GetComponent<Furnace>();
-            if (furnace != null && !furnace.HasItem())
-                furnace.PutItem(slot.GetItem(), melt_item, duration, iidata.quantity);
+            if (furnace != null && furnace.CountItemSpace() > 0)
+            {
+                int create_quantity = Mathf.FloorToInt(iidata.quantity / (float)melt_item_quantity);
+                int quantity = furnace.PutItem(slot.GetItem(), melt_item, duration, create_quantity);
+                inventory.RemoveItemAt(slot.index, quantity * melt_item_quantity);
+            }
         }
 
         public override bool CanDoAction(PlayerCharacter character, ItemSlot slot, Selectable select)
@@ -31,7 +35,7 @@ namespace SurvivalEngine
             Furnace furnace = select.GetComponent<Furnace>();
             InventoryData inventory = slot.GetInventory();
             InventoryItemData iidata = inventory?.GetItem(slot.index);
-            return furnace != null && iidata != null && !furnace.HasItem();
+            return furnace != null && iidata != null && furnace.CountItemSpace() > 0 && melt_item_quantity > 0;
         }
     }
 

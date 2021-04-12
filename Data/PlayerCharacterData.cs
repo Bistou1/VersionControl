@@ -20,6 +20,7 @@ namespace SurvivalEngine
 
         public Vector3Data position;
         public int xp = 0;
+        public int gold = 0;
 
         public Dictionary<AttributeType, float> attributes = new Dictionary<AttributeType, float>();
         public Dictionary<BonusType, TimedBonusData> timed_bonus_effects = new Dictionary<BonusType, TimedBonusData>();

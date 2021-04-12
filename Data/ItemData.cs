@@ -79,7 +79,8 @@ namespace SurvivalEngine
         public WeaponType weapon_type;
         public int damage = 0;
         public float range = 1f;
-        public float attack_speed = 100f; //100 = 1 attack per second, 200 = 2 attack per second, etc.
+        public float attack_anim_speed = 1f; //Will multiply the animation/windup/windout by this value
+        public float attack_cooldown = 1f; //Seconds of waiting in between each attack
         public int strike_per_attack = 0; //Minimum is 1, if set to 3, each attack will hit 3 times, or shoot 3 projectiles
         public float strike_interval = 0f; //Interval in seconds between each strike of a single attack
 
@@ -94,10 +95,15 @@ namespace SurvivalEngine
         [Header("Action")]
         public SAction[] actions;
 
+        [Header("Shop")]
+        public int buy_cost = 0;
+        public int sell_cost = 0;
+
         [Header("Ref Data")]
         public ItemData container_data;
         public PlantData plant_data;
         public ConstructionData construction_data;
+        public CharacterData character_data;
         public GroupData projectile_group;
 
         [Header("Prefab")]
@@ -147,6 +153,17 @@ namespace SurvivalEngine
             return null;
         }
 
+        public void RunAutoActions(PlayerCharacter player, ItemSlot slot)
+        {
+            foreach (SAction action in actions)
+            {
+                if (action.IsAuto() && action.CanDoAction(player, slot))
+                {
+                    action.DoAction(player, slot);
+                }
+            }
+        }
+
         public bool CanBeDropped()
         {
             return item_prefab != null;
@@ -154,12 +171,7 @@ namespace SurvivalEngine
 
         public bool CanBeBuilt()
         {
-            return construction_data != null;
-        }
-
-        public bool CanBeSowed()
-        {
-            return plant_data != null;
+            return construction_data != null || character_data != null || plant_data != null;
         }
 
         public bool IsWeapon()

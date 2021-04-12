@@ -12,7 +12,6 @@ namespace SurvivalEngine
     public class ActionFill : MAction
     {
         public ItemData filled_item;
-        public float fill_range = 2f;
 
         //Merge action
         public override void DoAction(PlayerCharacter character, ItemSlot slot, Selectable select)

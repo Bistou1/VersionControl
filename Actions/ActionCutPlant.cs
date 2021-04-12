@@ -16,7 +16,7 @@ namespace SurvivalEngine
             Plant plant = select.GetComponent<Plant>();
             if (plant != null)
             {
-                string animation = PlayerCharacterAnim.Get() ? PlayerCharacterAnim.Get().take_anim : "";
+                string animation = character.Animation ? character.Animation.take_anim : "";
                 character.TriggerAnim(animation, plant.transform.position);
                 character.TriggerAction(0.5f, () =>
                 {

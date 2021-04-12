@@ -33,7 +33,7 @@ namespace SurvivalEngine
         public override bool CanDoAction(PlayerCharacter character, Selectable select)
         {
             ItemProvider pond = select.GetComponent<ItemProvider>();
-            return pond != null && pond.HasItem() && character.EquipData.HasItemInGroup(fishing_rod);
+            return pond != null && pond.HasItem() && character.EquipData.HasItemInGroup(fishing_rod) && !character.IsSwimming();
         }
     }
 

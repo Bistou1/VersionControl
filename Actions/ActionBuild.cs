@@ -29,6 +29,17 @@ namespace SurvivalEngine
 
                 TheAudio.Get().PlaySFX("craft", item.craft_sound);
             }
+
+            if (item != null && item.character_data != null)
+            {
+                character.Crafting.CraftCharacterBuildMode(item.character_data, false, (Buildable build) =>
+                {
+                    InventoryItemData invdata = inventory.GetItem(slot.index);
+                    inventory.RemoveItemAt(slot.index, 1);
+                });
+
+                TheAudio.Get().PlaySFX("craft", item.craft_sound);
+            }
         }
     }
 

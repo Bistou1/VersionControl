@@ -22,7 +22,6 @@ namespace SurvivalEngine
         public string uid;
         public string construction_id;
         public string scene;
-        public int owner;
         public Vector3Data pos;
         public QuaternionData rot;
         public float durability;
@@ -34,7 +33,6 @@ namespace SurvivalEngine
         public string uid;
         public string plant_id;
         public string scene;
-        public int owner;
         public Vector3Data pos;
         public QuaternionData rot;
         public int growth_stage;
@@ -46,7 +44,6 @@ namespace SurvivalEngine
         public string uid;
         public string character_id;
         public string scene;
-        public int owner;
         public Vector3Data pos;
         public QuaternionData rot;
     }
@@ -71,6 +68,12 @@ namespace SurvivalEngine
         public float scale;
         public float time; //Time left before regrowth
         public float probability; //Probability to spawn after time expire
+    }
+
+    public enum TimeType
+    {
+        GameHours = 0,
+        GameDays = 10,
     }
 
     /// <summary>
@@ -206,13 +209,12 @@ namespace SurvivalEngine
 
         //---- Constructions and Plants and Characters
 
-        public BuiltConstructionData AddConstruction(string construct_id, string scene, int owner, Vector3 pos, Quaternion rot, float durability)
+        public BuiltConstructionData AddConstruction(string construct_id, string scene, Vector3 pos, Quaternion rot, float durability)
         {
             BuiltConstructionData citem = new BuiltConstructionData();
             citem.uid = UniqueID.GenerateUniqueID();
             citem.construction_id = construct_id;
             citem.scene = scene;
-            citem.owner = owner;
             citem.pos = pos;
             citem.rot = rot;
             citem.durability = durability;
@@ -233,13 +235,12 @@ namespace SurvivalEngine
             return null;
         }
 
-        public SowedPlantData AddPlant(string plant_id, string scene, int owner, Vector3 pos, Quaternion rot, int stage)
+        public SowedPlantData AddPlant(string plant_id, string scene, Vector3 pos, Quaternion rot, int stage)
         {
             SowedPlantData citem = new SowedPlantData();
             citem.uid = UniqueID.GenerateUniqueID();
             citem.plant_id = plant_id;
             citem.scene = scene;
-            citem.owner = owner;
             citem.pos = pos;
             citem.rot = rot;
             citem.growth_stage = stage;
@@ -266,13 +267,12 @@ namespace SurvivalEngine
             return null;
         }
 
-        public TrainedCharacterData AddCharacter(string character_id, string scene, int owner, Vector3 pos, Quaternion rot)
+        public TrainedCharacterData AddCharacter(string character_id, string scene, Vector3 pos, Quaternion rot)
         {
             TrainedCharacterData citem = new TrainedCharacterData();
             citem.uid = UniqueID.GenerateUniqueID();
             citem.character_id = character_id;
             citem.scene = scene;
-            citem.owner = owner;
             citem.pos = pos;
             citem.rot = rot;
             trained_characters[citem.uid] = citem;
@@ -409,26 +409,26 @@ namespace SurvivalEngine
         }
 
         // ---- Unique Ids (Custom data) ----
-        public void SetUniqueID(string unique_id, int val)
+        public void SetCustomValue(string unique_id, int val)
         {
             if (!string.IsNullOrEmpty(unique_id))
                 unique_ids[unique_id] = val;
         }
 
-        public void RemoveUniqueID(string unique_id)
+        public void RemoveCustomValue(string unique_id)
         {
             if (unique_ids.ContainsKey(unique_id))
                 unique_ids.Remove(unique_id);
         }
 
-        public int GetUniqueID(string unique_id)
+        public int GetCustomValue(string unique_id)
         {
             if (unique_ids.ContainsKey(unique_id))
                 return unique_ids[unique_id];
             return 0;
         }
 
-        public bool HasUniqueID(string unique_id)
+        public bool HasCustomValue(string unique_id)
         {
             return unique_ids.ContainsKey(unique_id);
         }
@@ -492,6 +492,26 @@ namespace SurvivalEngine
             return GetInventory(type, uid);
         }
 
+        public bool HasInventory(int player_id)
+        {
+            return HasInventory(GetPlayerUID(player_id));
+        }
+
+        public bool HasEquipInventory(int player_id)
+        {
+            return HasInventory(GetPlayerEquipUID(player_id));
+        }
+
+        public bool HasInventory(string inventory_uid)
+        {
+            if (!string.IsNullOrEmpty(inventory_uid))
+            {
+                if (inventories.ContainsKey(inventory_uid))
+                    return true;
+            }
+            return false;
+        }
+
         public PlayerCharacterData GetPlayerCharacter(int player_id)
         {
             PlayerCharacterData cdata;
@@ -526,6 +546,11 @@ namespace SurvivalEngine
         public bool IsNewGame()
         {
             return play_time < 0.0001f;
+        }
+
+        public float GetTotalTime()
+        {
+            return (day - 1) * 24f + day_time;
         }
 
         //--- Save / load -----
@@ -604,6 +629,16 @@ namespace SurvivalEngine
             if (string.IsNullOrEmpty(name))
                 name = "player"; //Default name
             return name;
+        }
+
+        public static bool HasLastSave()
+        {
+            return SaveSystem.DoesFileExist(GetLastSave());
+        }
+
+        public static bool HasSave(string filename)
+        {
+            return SaveSystem.DoesFileExist(filename);
         }
 
         public static void Unload()

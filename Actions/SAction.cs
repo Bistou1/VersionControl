@@ -37,6 +37,8 @@ namespace SurvivalEngine
             return true; //No condition
         }
 
+        public bool IsAuto() { return (this is AAction); }
+        public bool IsMerge() { return (this is MAction); }
     }
 
 }

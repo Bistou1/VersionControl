@@ -367,6 +367,11 @@ namespace SurvivalEngine
         {
             return PlayerData.Get().GetEquipInventory(type, player_id);
         }
+
+        public static bool Exists(string uid)
+        {
+            return PlayerData.Get().HasInventory(uid);
+        }
     }
 
 }

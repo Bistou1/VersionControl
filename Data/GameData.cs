@@ -21,6 +21,12 @@ namespace SurvivalEngine
         public float night_light_ambient_intensity = 0.5f; //Ambient light at night
         public bool rotate_shadows = true; //Will rotate shadows during the day as if sun is rotating
 
+        [Header("Optimization")]
+        public float optim_refresh_rate = 0.5f; //In seconds, interval at which selectable are shown/hidden
+        public float optim_distance_multiplier = 1f; //will make all selectable active_range multiplied
+        public float optim_facing_offset = 10f; //active area will be offset by X in the direction the camera is facing
+        public bool optim_turn_off_gameobjects = false; //If on, will turn off the whole gameObjects, otherwise will just turn off scripts
+
         [Header("Music")]
         public AudioClip[] music_playlist;
 
