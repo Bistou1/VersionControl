@@ -7,34 +7,12 @@ using UnityEngine.UI;
 
 namespace SurvivalEngine
 {
-    public enum SlotType
-    {
-        None = 0,
-        Inventory = 5,
-        Equipment = 10,
-        Storage = 15,
-        Mixing=17,
-        Bag = 20,
-        Craft = 30,
-        CraftSub = 32,
-        CraftInfo = 34,
-
-        ActionSelectorUI = 40,
-        ActionSelectorGame = 42,
-
-        PauseMenu = 50,
-
-        Other = 100,
-    }
-
     /// <summary>
     /// Basic class for any type of slot (item, other)
     /// </summary>
 
     public class UISlot : MonoBehaviour
     {
-        public SlotType type;
-
         [Header("Navigation")] //Leave empty for default navigation
         public UISlot top;
         public UISlot down;
@@ -48,7 +26,10 @@ namespace SurvivalEngine
         public UnityAction<UISlot> onClickRight;
         public UnityAction<UISlot> onClickLong;
         public UnityAction<UISlot> onClickDouble;
-        public UnityAction<UISlot> onPressKey;
+        public UnityAction<UISlot> onPressKey; //Numerical key
+        public UnityAction<UISlot> onPressAccept;
+        public UnityAction<UISlot> onPressCancel;
+        public UnityAction<UISlot> onPressUse;
 
         protected Button button;
         protected EventTrigger evt_trigger;
@@ -134,7 +115,7 @@ namespace SurvivalEngine
             key_hover = false;
             foreach (KeyControlsUI kcontrols in KeyControlsUI.GetAll())
             {
-                bool hover = !use_mouse && kcontrols != null && kcontrols.GetSelectedPanel() == parent
+                bool hover = !use_mouse && kcontrols != null && kcontrols.GetFocusedPanel() == parent
                     && index >= 0 && kcontrols.GetSelectedIndex() == index;
                 key_hover = key_hover || hover;
             }
@@ -170,6 +151,24 @@ namespace SurvivalEngine
         {
             if (onClickRight != null)
                 onClickRight.Invoke(this);
+        }
+
+        public void KeyPressAccept()
+        {
+            if (onPressAccept != null)
+                onPressAccept.Invoke(this);
+        }
+
+        public void KeyPressCancel()
+        {
+            if (onPressCancel != null)
+                onPressCancel.Invoke(this);
+        }
+
+        public void KeyPressUse()
+        {
+            if (onPressUse != null)
+                onPressUse.Invoke(this);
         }
 
         void OnClick(BaseEventData eventData)

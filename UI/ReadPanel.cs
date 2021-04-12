@@ -27,6 +27,12 @@ namespace SurvivalEngine
                 panel_list.Remove(panel_id);
         }
 
+        protected override void Update()
+        {
+            base.Update();
+
+        }
+
         public void ShowPanel(string title, string desc)
         {
             this.title.text = title;

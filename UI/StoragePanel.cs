@@ -17,13 +17,16 @@ namespace SurvivalEngine
         {
             base.Awake();
             panel_list.Add(this);
+            unfocus_when_out = true;
 
             onSelectSlot += OnSelectSlot;
             onMergeSlot += OnMergeSlot;
+            onPressCancel += OnCancel;
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             panel_list.Remove(this);
         }
 
@@ -70,6 +73,11 @@ namespace SurvivalEngine
         private void OnMergeSlot(ItemSlot clicked_slot, ItemSlot selected_slot)
         {
            
+        }
+
+        private void OnCancel(UISlot slot)
+        {
+            Hide();
         }
 
         public string GetStorageUID()

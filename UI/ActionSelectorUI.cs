@@ -16,6 +16,8 @@ namespace SurvivalEngine
         private PlayerUI parent_ui;
         private ItemSlot slot;
 
+        private UISlotPanel prev_panel = null;
+
         private static List<ActionSelectorUI> selector_list = new List<ActionSelectorUI>();
 
         protected override void Awake()
@@ -29,8 +31,9 @@ namespace SurvivalEngine
 
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             selector_list.Remove(this);
         }
 
@@ -42,6 +45,22 @@ namespace SurvivalEngine
             PlayerControlsMouse.Get().onRightClick += OnMouseClick;
 
             onClickSlot += OnClick;
+            onPressAccept += OnAccept;
+            onPressCancel += OnCancel;
+            onPressUse += OnCancel;
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            //Auto focus
+            UISlotPanel focus_panel = UISlotPanel.GetFocusedPanel();
+            if (focus_panel != this && IsVisible() && PlayerControls.IsAnyGamePad())
+            {
+                prev_panel = focus_panel;
+                Focus();
+            }
         }
 
         private void RefreshSelector()
@@ -56,7 +75,7 @@ namespace SurvivalEngine
                 int index = 0;
                 foreach (SAction action in slot.GetItem().actions)
                 {
-                    if (index < slots.Length && action.CanDoAction(character, slot))
+                    if (index < slots.Length && !action.IsAuto() && action.CanDoAction(character, slot))
                     {
                         ActionSelectorButton button = (ActionSelectorButton) slots[index];
                         button.SetButton(action);
@@ -99,6 +118,20 @@ namespace SurvivalEngine
         {
             ActionSelectorButton button = (ActionSelectorButton)islot;
             OnClickAction(button.GetAction());
+        }
+
+        private void OnAccept(UISlot slot)
+        {
+            OnClick(slot);
+            UISlotPanel.UnfocusAll();
+            if (prev_panel != null)
+                prev_panel.Focus();
+        }
+
+        private void OnCancel(UISlot slot)
+        {
+            ItemSlotPanel.CancelSelectionAll();
+            Hide();
         }
 
         public void OnClickAction(SAction action)

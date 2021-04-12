@@ -32,6 +32,13 @@ namespace SurvivalEngine
 
             if(speaker_btn != null)
                 speaker_btn.sprite = PlayerData.Get().master_volume > 0.1f ? speaker_on : speaker_off;
+
+        }
+
+        public override void Hide(bool instant = false)
+        {
+            base.Hide(instant);
+
         }
 
         public void OnClickSave()
@@ -41,7 +48,10 @@ namespace SurvivalEngine
 
         public void OnClickLoad()
         {
-            StartCoroutine(LoadRoutine());
+            if (PlayerData.HasLastSave())
+                StartCoroutine(LoadRoutine());
+            else
+                StartCoroutine(NewRoutine());
         }
 
         public void OnClickNew()

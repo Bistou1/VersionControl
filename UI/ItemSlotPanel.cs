@@ -35,8 +35,9 @@ namespace SurvivalEngine
                 ((ItemSlot) slots[i]).Hide();
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             slot_panels.Remove(this);
         }
 
@@ -48,6 +49,9 @@ namespace SurvivalEngine
 
             onClickSlot += OnClick;
             onRightClickSlot += OnClickRight;
+            onPressAccept += OnClick;
+            onPressUse += OnClickRight;
+            onPressCancel += OnCancel;
 
             InitPanel();
         }
@@ -98,6 +102,10 @@ namespace SurvivalEngine
                         slot.Hide();
                     }
                 }
+
+                ItemSlot sslot = GetSelectedSlot();
+                if (sslot != null && sslot.GetItem() == null)
+                    CancelSelection();
             }
         }
 
@@ -150,6 +158,9 @@ namespace SurvivalEngine
                     CancelSelectionAll();
                     selected_slot = slot;
 
+                    ItemData idata = islot?.GetItem();
+                    idata?.RunAutoActions(GetPlayer(), islot);
+
                     if (onSelectSlot != null)
                         onSelectSlot.Invoke(islot);
                 }
@@ -171,6 +182,12 @@ namespace SurvivalEngine
                 selected_right_slot = islot.index;
                 ActionSelectorUI.Get(GetPlayerID()).Show(islot);
             }
+        }
+
+        private void OnCancel(UISlot slot)
+        {
+            ItemSlotPanel.CancelSelectionAll();
+            UISlotPanel.UnfocusAll();
         }
 
         public void SetInventory(InventoryType type, string uid, int size)
@@ -297,9 +314,20 @@ namespace SurvivalEngine
                 InventoryItemData invdata = inventory1.GetItem(slot_select.index);
                 if (invdata != null && invdata.quantity > 0 && slot_target.GetItem() == null)
                 {
-                    string uid = invdata.quantity > 1 ? UniqueID.GenerateUniqueID() : invdata.uid;
-                    inventory1.RemoveItemAt(slot_select.index, 1);
-                    inventory2.AddItemAt(invdata.item_id, slot_target.index, 1, invdata.durability, uid);
+                    if(inventory2.type == InventoryType.Equipment)
+                    {
+                        current_player.Inventory.EquipItem(inventory1, slot_select.index);
+                    }
+                    else if (inventory1.type == InventoryType.Equipment && slot_select is EquipSlotUI)
+                    {
+                        EquipSlotUI eslot = (EquipSlotUI)slot_select;
+                        current_player.Inventory.UnequipItemTo(inventory2, eslot.equip_slot, slot_target.index);
+                    }
+                    else {
+                        string uid = invdata.quantity > 1 ? UniqueID.GenerateUniqueID() : invdata.uid;
+                        inventory1.RemoveItemAt(slot_select.index, 1);
+                        inventory2.AddItemAt(invdata.item_id, slot_target.index, 1, invdata.durability, uid);
+                    }
 
                     if (invdata.quantity <= 1)
                     {
@@ -427,7 +455,7 @@ namespace SurvivalEngine
         {
             foreach (ItemSlotPanel panel in slot_panels)
             {
-                if (panel.inventory_type == type)
+                if (panel != null && panel.inventory_type == type)
                     return panel;
             }
             return null;
@@ -437,7 +465,7 @@ namespace SurvivalEngine
         {
             foreach (ItemSlotPanel panel in slot_panels)
             {
-                if (panel.inventory_uid == inventory_uid)
+                if (panel != null && panel.inventory_uid == inventory_uid)
                     return panel;
             }
             return null;

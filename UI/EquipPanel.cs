@@ -21,12 +21,14 @@ namespace SurvivalEngine
             base.Awake();
             panel_list.Add(this);
             parent_ui = GetComponentInParent<PlayerUI>();
+            unfocus_when_out = true;
 
             Hide(true);
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             panel_list.Remove(this);
         }
 
@@ -38,14 +40,20 @@ namespace SurvivalEngine
 
         public override void InitPanel()
         {
+            base.InitPanel();
+
             if (!IsInventorySet())
             {
-                PlayerCharacter player = parent_ui ? parent_ui.GetPlayer() : PlayerCharacter.GetFirst();
+                PlayerCharacter player = GetPlayer();
                 if (player != null)
                 {
-                    SetInventory(InventoryType.Equipment, player.EquipData.uid, 99); //Size not important for equip inventory
-                    SetPlayer(player);
-                    Show(true);
+                    bool has_inventory = PlayerData.Get().HasInventory(player.player_id);
+                    if (has_inventory)
+                    {
+                        SetInventory(InventoryType.Equipment, player.EquipData.uid, player.EquipData.size);
+                        SetPlayer(player);
+                        Show(true);
+                    }
                 }
             }
         }

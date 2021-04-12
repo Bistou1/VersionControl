@@ -18,6 +18,7 @@ namespace SurvivalEngine
         public Animator animator;
 
         private PlayerUI parent_ui;
+        private UISlot prev_slot;
 
         private GroupData current_category;
 
@@ -33,8 +34,9 @@ namespace SurvivalEngine
                 animator.SetBool("Visible", IsVisible());
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             panel_list.Remove(this);
         }
 
@@ -43,6 +45,38 @@ namespace SurvivalEngine
             base.Start();
 
             onClickSlot += OnClick;
+            onPressAccept += OnAccept;
+            onPressCancel += OnCancel;
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            
+        }
+
+        protected override void RefreshPanel()
+        {
+            base.RefreshPanel();
+
+            //Gamepad auto controls
+            PlayerCharacter player = GetPlayer();
+            CraftInfoPanel info_panel = CraftInfoPanel.Get(GetPlayerID());
+            if (UISlotPanel.GetFocusedPanel() == this)
+            {
+                selection_index = Mathf.Clamp(selection_index, 0, CountActiveSlots() - 1);
+
+                UISlot slot = GetSelectSlot();
+                if (player != null && !player.Crafting.IsBuildMode())
+                {
+                    if (prev_slot != slot || !info_panel.IsVisible())
+                    {
+                        OnClick(slot);
+                        prev_slot = slot;
+                    }
+                }
+            }
         }
 
         public void RefreshCraftPanel()
@@ -54,7 +88,7 @@ namespace SurvivalEngine
                 return;
 
             //Show all items of a category
-            PlayerCharacter player = parent_ui.GetPlayer();
+            PlayerCharacter player = GetPlayer();
             if (player != null)
             {
                 List<CraftData> items = CraftData.GetAllCraftableInGroup(parent_ui.GetPlayer(), current_category);
@@ -138,6 +172,21 @@ namespace SurvivalEngine
                     info_panel.ShowData(item);
                 }
             }
+        }
+
+        private void OnAccept(UISlot slot)
+        {
+            PlayerCharacter player = PlayerCharacter.Get(GetPlayerID());
+            CraftInfoPanel.Get(GetPlayerID())?.OnClickCraft();
+            if (player.Crafting.IsBuildMode())
+                UISlotPanel.UnfocusAll();
+        }
+
+        private void OnCancel(UISlot slot)
+        {
+            CancelSelection();
+            CraftInfoPanel.Get(GetPlayerID())?.Hide();
+            CraftPanel.Get(GetPlayerID())?.Focus();
         }
 
         public void CancelSelection()

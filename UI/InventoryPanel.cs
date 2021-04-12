@@ -21,6 +21,7 @@ namespace SurvivalEngine
             base.Awake();
             panel_list.Add(this);
             parent_ui = GetComponentInParent<PlayerUI>();
+            unfocus_when_out = true;
 
             for (int i = 0; i < slots.Length; i++)
             {
@@ -30,8 +31,9 @@ namespace SurvivalEngine
             Hide(true);
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             panel_list.Remove(this);
         }
 
@@ -40,16 +42,39 @@ namespace SurvivalEngine
             base.Start();
         }
 
+        protected override void RefreshPanel()
+        {
+            base.RefreshPanel();
+
+            //Automatic actions
+            PlayerCharacter player = GetPlayer();
+            if (player != null)
+            {
+                foreach (UISlot slot in slots)
+                {
+                    ItemSlot islot = (ItemSlot)slot;
+                    ItemData idata = islot?.GetItem();
+                    idata?.RunAutoActions(player, islot);
+                }
+            }
+        }
+
         public override void InitPanel()
         {
+            base.InitPanel();
+
             if (!IsInventorySet())
             {
-                PlayerCharacter player = parent_ui ? parent_ui.GetPlayer() : PlayerCharacter.GetFirst();
+                PlayerCharacter player = GetPlayer();
                 if (player != null)
                 {
-                    SetInventory(InventoryType.Inventory, player.InventoryData.uid, player.Inventory.inventory_size);
-                    SetPlayer(player);
-                    Show(true);
+                    bool has_inventory = PlayerData.Get().HasInventory(player.player_id);
+                    if (has_inventory)
+                    {
+                        SetInventory(InventoryType.Inventory, player.InventoryData.uid, player.InventoryData.size);
+                        SetPlayer(player);
+                        Show(true);
+                    }
                 }
             }
         }
@@ -57,7 +82,7 @@ namespace SurvivalEngine
         private void OnPressShortcut(UISlot slot)
         {
             CancelSelection();
-            KeyClickSlot(slot.index, false);
+            PressSlot(slot.index);
         }
 
         public static InventoryPanel Get(int player_id=0)

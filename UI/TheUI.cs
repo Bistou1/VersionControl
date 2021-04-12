@@ -77,6 +77,16 @@ namespace SurvivalEngine
                     TheGame.Get().Unpause();
             }
 
+            //Gamepad auto focus
+            UISlotPanel focus_panel = UISlotPanel.GetFocusedPanel();
+            if (focus_panel != pause_panel && TheGame.Get().IsPausedByPlayer() && PlayerControls.IsAnyGamePad())
+            {
+                pause_panel.Focus();
+            }
+            if (focus_panel == pause_panel && !TheGame.Get().IsPausedByPlayer())
+            {
+               UISlotPanel.UnfocusAll();
+            }
         }
 
         public void ShowGameOver()
@@ -99,6 +109,11 @@ namespace SurvivalEngine
         public bool IsBlockingPanelOpened()
         {
             return StoragePanel.IsAnyVisible() || ReadPanel.IsAnyVisible() || pause_panel.IsVisible() || game_over_panel.IsVisible();
+        }
+
+        public bool IsFullPanelOpened()
+        {
+            return pause_panel.IsVisible() || game_over_panel.IsVisible();
         }
 
         //Convert a screen position (like mouse) to a anchored position in the canvas

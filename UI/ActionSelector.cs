@@ -28,8 +28,9 @@ namespace SurvivalEngine
             gameObject.SetActive(false);
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             selector_list.Remove(this);
         }
 
@@ -41,6 +42,9 @@ namespace SurvivalEngine
             PlayerControlsMouse.Get().onRightClick += OnMouseClick;
 
             onClickSlot += OnClick;
+            onPressAccept += OnAccept;
+            onPressCancel += OnCancel;
+            onPressUse += OnCancel;
         }
 
         protected override void Update()
@@ -64,6 +68,11 @@ namespace SurvivalEngine
 
             if (IsVisible() && select == null)
                 Hide();
+
+            //Auto focus
+            UISlotPanel focus_panel = UISlotPanel.GetFocusedPanel();
+            if (focus_panel != this && IsVisible() && PlayerControls.IsAnyGamePad())
+                Focus();
         }
 
         private void RefreshSelector()
@@ -76,7 +85,7 @@ namespace SurvivalEngine
                 int index = 0;
                 foreach (SAction action in select.actions)
                 {
-                    if (index < slots.Length && action.CanDoAction(character, select))
+                    if (index < slots.Length && !action.IsAuto() && action.CanDoAction(character, select))
                     {
                         ActionSelectorButton button = (ActionSelectorButton) slots[index];
                         button.SetButton(action);
@@ -121,6 +130,16 @@ namespace SurvivalEngine
         {
             ActionSelectorButton button = (ActionSelectorButton)islot;
             OnClickAction(button.GetAction());
+        }
+
+        private void OnAccept(UISlot slot)
+        {
+            OnClick(slot);
+            UISlotPanel.UnfocusAll();
+        }
+
+        private void OnCancel(UISlot slot) {
+            Hide();
         }
 
         public void OnClickAction(SAction action)

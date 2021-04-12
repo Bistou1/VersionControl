@@ -19,6 +19,7 @@ namespace SurvivalEngine
 
         private CraftStation current_staton = null;
         private int selected_slot = -1;
+        private UISlot prev_slot;
 
         private List<GroupData> default_categories = new List<GroupData>();
 
@@ -41,8 +42,9 @@ namespace SurvivalEngine
                 animator.SetBool("Visible", IsVisible());
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             panel_list.Remove(this);
         }
 
@@ -54,6 +56,8 @@ namespace SurvivalEngine
             PlayerControlsMouse.Get().onRightClick += (Vector3) => { CancelSelection(); };
 
             onClickSlot += OnClick;
+            onPressAccept += OnAccept;
+            onPressCancel += OnCancel;
 
             RefreshCategories();
         }
@@ -75,14 +79,37 @@ namespace SurvivalEngine
         {
             base.RefreshPanel();
 
-            PlayerCharacter player = parent_ui.GetPlayer();
-            if (player != null && IsVisible())
+            PlayerCharacter player = GetPlayer();
+            if (player != null)
             {
                 CraftStation station = player.Crafting.GetCraftStation();
                 if (current_staton != station)
                 {
                     current_staton = station;
                     RefreshCategories();
+                }
+            }
+
+            //Gamepad auto controls
+            PlayerControls controls = PlayerControls.Get(GetPlayerID());
+            CraftSubPanel sub_panel = CraftSubPanel.Get(GetPlayerID());
+            UISlotPanel focus_panel = UISlotPanel.GetFocusedPanel();
+            if (focus_panel != this && focus_panel != sub_panel && !TheUI.Get().IsBlockingPanelOpened()
+                && controls.IsGamePad() && player != null && !player.Crafting.IsBuildMode())
+            {
+                Focus();
+                CraftInfoPanel.Get(GetPlayerID())?.Hide();
+            }
+            if (focus_panel == this)
+            {
+                selection_index = Mathf.Clamp(selection_index, 0, CountActiveSlots() - 1);
+
+                UISlot slot = GetSelectSlot();
+                if (prev_slot != slot || !sub_panel.IsVisible())
+                {
+                    OnClick(slot);
+                    sub_panel.selection_index = 0;
+                    prev_slot = slot;
                 }
             }
         }
@@ -158,6 +185,18 @@ namespace SurvivalEngine
                     CraftSubPanel.Get(GetPlayerID())?.ShowCategory(cslot.group);
                 }
             }
+        }
+
+        private void OnAccept(UISlot slot)
+        {
+            CraftSubPanel.Get(GetPlayerID())?.Focus();
+        }
+
+        private void OnCancel(UISlot slot)
+        {
+            Toggle();
+            CraftSubPanel.Get(GetPlayerID())?.Hide();
+            UISlotPanel.UnfocusAll();
         }
 
         public void CancelSubSelection()

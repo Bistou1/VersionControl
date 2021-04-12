@@ -29,7 +29,10 @@ namespace SurvivalEngine
 
         public void OnClickLoad()
         {
-            StartCoroutine(LoadRoutine());
+            if (PlayerData.HasLastSave())
+                StartCoroutine(LoadRoutine());
+            else
+                StartCoroutine(NewRoutine());
         }
 
         public void OnClickNew()

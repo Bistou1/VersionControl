@@ -16,13 +16,16 @@ namespace SurvivalEngine {
         public int player_id;
 
         [Header("Gameplay UI")]
+        public Text gold_value;
         public UIPanel damage_fx;
+        public UIPanel cold_fx;
         public Text build_mode_text;
         public Image tps_cursor;
 
         public UnityAction onCancelSelection;
 
         private ItemSlotPanel[] item_slot_panels;
+        private float damage_fx_timer = 0f;
 
         private static List<PlayerUI> ui_list = new List<PlayerUI>();
 
@@ -60,16 +63,36 @@ namespace SurvivalEngine {
         {
             base.Update();
 
+            PlayerCharacter character = GetPlayer();
+            int gold = (character != null) ? character.Data.gold : 0;
+            if(gold_value != null)
+                gold_value.text = gold.ToString();
+
             //Init inventories from here because they are disabled
             foreach (ItemSlotPanel panel in item_slot_panels)
                 panel.InitPanel();
 
             //Fx visibility
+            damage_fx_timer += Time.deltaTime;
+
             if (build_mode_text != null)
                 build_mode_text.enabled = IsBuildMode();
 
             if (tps_cursor != null)
                 tps_cursor.enabled = TheCamera.Get().IsLocked();
+
+            if(character != null && !character.IsDead() && character.Attributes.IsDepletingHP())
+                DoDamageFXInterval();
+
+            //Cold FX
+            if (character != null && !character.IsDead())
+            {
+                PlayerCharacterHeat characterHeat = PlayerCharacterHeat.Get(character.player_id);
+                if (cold_fx != null && characterHeat != null)
+                    cold_fx.SetVisible(characterHeat.IsCold());
+                if (damage_fx != null && characterHeat != null && characterHeat.IsColdDamage())
+                    DoDamageFXInterval();
+            }
 
             //Controls
             PlayerControls controls = PlayerControls.Get(player_id);
@@ -82,7 +105,6 @@ namespace SurvivalEngine {
             }
 
             //Backpack panel
-            PlayerCharacter character = GetPlayer();
             BagPanel bag_panel = BagPanel.Get(player_id);
             if (character != null && bag_panel != null)
             {
@@ -101,8 +123,15 @@ namespace SurvivalEngine {
                 StartCoroutine(DamageFXRun());
         }
 
+        public void DoDamageFXInterval()
+        {
+            if (damage_fx != null && damage_fx_timer > 0f)
+                StartCoroutine(DamageFXRun());
+        }
+
         private IEnumerator DamageFXRun()
         {
+            damage_fx_timer = -3f;
             damage_fx.Show();
             yield return new WaitForSeconds(1f);
             damage_fx.Hide();
