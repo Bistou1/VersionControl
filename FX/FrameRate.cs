@@ -1,35 +1,33 @@
 ﻿using UnityEngine;
-using System.Collections;
 
 namespace SurvivalEngine
 {
     public class FrameRate : MonoBehaviour
     {
-        private float deltaTime = 0.0f;
-
-        GUIStyle style;
+        private float average_delta = 0f;
+        private GUIStyle style;
 
         private void Start()
         {
-            int w = Screen.width, h = Screen.height;
             style = new GUIStyle();
             style.alignment = TextAnchor.UpperLeft;
-            style.fontSize = h * 2 / 100;
-            style.normal.textColor = new Color(0.0f, 0.0f, 0.5f, 1.0f);
+            style.fontSize = Screen.height / 50;
+            style.normal.textColor = new Color(0f, 0f, 0.4f, 1f);
         }
 
         void Update()
         {
-            deltaTime += (Time.deltaTime - deltaTime) * 0.1f;
+            float diff = Time.unscaledDeltaTime - average_delta;
+            average_delta += diff * 0.2f;
         }
 
         void OnGUI()
         {
-            int w = Screen.width, h = Screen.height;
-            Rect rect = new Rect(0, 0, w, h * 2 / 100);
-            float msec = deltaTime * 1000.0f;
-            float fps = 1.0f / deltaTime;
-            string text = string.Format("{0:0.0} ms ({1:0.} fps)", msec, fps);
+            float miliseconds = average_delta * 1000f;
+            float frame_rate = 1f / average_delta;
+            string text = miliseconds.ToString("0.0") + " ms (" + frame_rate.ToString("0") + " fps)";
+
+            Rect rect = new Rect(0, 0, Screen.width, Screen.height / 50);
             GUI.Label(rect, text, style);
         }
     }
