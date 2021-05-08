@@ -4,6 +4,15 @@ using UnityEngine;
 
 namespace SurvivalEngine
 {
+    /// <summary>
+    /// SData is the base scriptable object data for this engine
+    /// </summary>
+    [System.Serializable]
+    public abstract class SData : ScriptableObject { }
+
+    /// <summary>
+    /// Crafting cost
+    /// </summary>
 
     [System.Serializable]
     public class CraftCostData
@@ -18,7 +27,7 @@ namespace SurvivalEngine
     /// Parent data class for craftable items (items, constructions, plants)
     /// </summary>
 
-    public class CraftData : ScriptableObject
+    public class CraftData : SData
     {
         [Header("--- CraftData ------------------")]
         public string id;
@@ -47,7 +56,7 @@ namespace SurvivalEngine
         [Header("FX")]
         public AudioClip craft_sound;
 
-        private static List<CraftData> craft_data = new List<CraftData>();
+        protected static List<CraftData> craft_data = new List<CraftData>();
 
         public bool HasGroup(GroupData group)
         {
@@ -137,10 +146,7 @@ namespace SurvivalEngine
         public static void Load()
         {
             craft_data.Clear();
-            craft_data.AddRange(ItemData.GetAll());
-            craft_data.AddRange(ConstructionData.GetAll());
-            craft_data.AddRange(PlantData.GetAll());
-            craft_data.AddRange(CharacterData.GetAll());
+            craft_data.AddRange(Resources.LoadAll<CraftData>(""));
         }
 
         public static List<CraftData> GetAllInGroup(GroupData group)
@@ -209,5 +215,4 @@ namespace SurvivalEngine
             return Craftable.Create(data, pos, owner);
         }
     }
-
 }

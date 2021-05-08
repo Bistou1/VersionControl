@@ -19,12 +19,13 @@ namespace SurvivalEngine
         void Awake()
         {
             _instance = this;
-            ItemData.Load(assets.items_folder);
-            ConstructionData.Load(assets.constructions_folder);
-            PlantData.Load(assets.plants_folder);
-            CharacterData.Load(assets.characters_folder);
-            CraftData.Load();
 
+            CraftData.Load();
+            ItemData.Load();
+            ConstructionData.Load();
+            PlantData.Load();
+            CharacterData.Load();
+            
             //Load managers
             if (!FindObjectOfType<TheUI>())
                 Instantiate(TheGame.IsMobile() ? assets.ui_canvas_mobile : assets.ui_canvas);

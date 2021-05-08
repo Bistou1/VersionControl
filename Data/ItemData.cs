@@ -141,7 +141,7 @@ namespace SurvivalEngine
 
             foreach (SAction action in actions)
             {
-                if (action is MAction)
+                if (action != null && action is MAction)
                 {
                     MAction maction = (MAction)action;
                     if (other.HasGroup(maction.merge_target))
@@ -153,15 +153,18 @@ namespace SurvivalEngine
             return null;
         }
 
-        public void RunAutoActions(PlayerCharacter player, ItemSlot slot)
+        public AAction FindAutoAction(PlayerCharacter character, ItemSlot islot)
         {
             foreach (SAction action in actions)
             {
-                if (action.IsAuto() && action.CanDoAction(player, slot))
+                if (action != null && action is AAction)
                 {
-                    action.DoAction(player, slot);
+                    AAction aaction = (AAction)action;
+                    if (aaction.CanDoAction(character, islot))
+                        return aaction;
                 }
             }
+            return null;
         }
 
         public bool CanBeDropped()
@@ -201,15 +204,14 @@ namespace SurvivalEngine
             return Mathf.RoundToInt(perc * 100f);
         }
 
-        public static void Load(string items_folder)
+        public static new void Load()
         {
             item_data.Clear();
             item_dict.Clear();
-            item_data.AddRange(Resources.LoadAll<ItemData>(items_folder));
+            item_data.AddRange(Resources.LoadAll<ItemData>(""));
+
             foreach (ItemData item in item_data)
-            {
                 item_dict.Add(item.id, item);
-            }
         }
 
         public new static ItemData Get(string item_id)
@@ -225,4 +227,10 @@ namespace SurvivalEngine
         }
     }
 
+    [System.Serializable]
+    public struct ItemDataValue
+    {
+        public ItemData item;
+        public int quantity;
+    }
 }

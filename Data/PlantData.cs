@@ -26,10 +26,10 @@ namespace SurvivalEngine
             return plant_prefab;
         }
 
-        public static void Load(string plant_folder)
+        public static new void Load()
         {
             plant_data.Clear();
-            plant_data.AddRange(Resources.LoadAll<PlantData>(plant_folder));
+            plant_data.AddRange(Resources.LoadAll<PlantData>(""));
         }
 
         public new static PlantData Get(string construction_id)

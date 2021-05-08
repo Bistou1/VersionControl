@@ -58,7 +58,7 @@ namespace SurvivalEngine
     }
 
     [System.Serializable]
-    public class WorldRegrowthData
+    public class RegrowthData
     {
         public string data_id;
         public string uid; //uid of the original object
@@ -109,12 +109,13 @@ namespace SurvivalEngine
         public Dictionary<string, int> unique_ids = new Dictionary<string, int>();
         public Dictionary<string, int> removed_objects = new Dictionary<string, int>(); //1 = removed
         public Dictionary<string, int> hidden_objects = new Dictionary<string, int>(); //1 = hidden
+
         public Dictionary<string, DroppedItemData> dropped_items = new Dictionary<string, DroppedItemData>();
         public Dictionary<string, BuiltConstructionData> built_constructions = new Dictionary<string, BuiltConstructionData>();
         public Dictionary<string, SowedPlantData> sowed_plants = new Dictionary<string, SowedPlantData>();
         public Dictionary<string, TrainedCharacterData> trained_characters = new Dictionary<string, TrainedCharacterData>();
         public Dictionary<string, SceneObjectData> scene_objects = new Dictionary<string, SceneObjectData>();
-        public Dictionary<string, WorldRegrowthData> world_regrowth = new Dictionary<string, WorldRegrowthData>();
+        public Dictionary<string, RegrowthData> world_regrowth = new Dictionary<string, RegrowthData>();
         
         //-------------------
 
@@ -161,7 +162,7 @@ namespace SurvivalEngine
             if (scene_objects == null)
                 scene_objects = new Dictionary<string, SceneObjectData>();
             if (world_regrowth == null)
-                world_regrowth = new Dictionary<string, WorldRegrowthData>();
+                world_regrowth = new Dictionary<string, RegrowthData>();
 
             foreach (KeyValuePair<int, PlayerCharacterData> character in player_characters)
                 character.Value.FixData();
@@ -339,7 +340,7 @@ namespace SurvivalEngine
 
         //---- World Regrowth -----
 
-        public void AddWorldRegrowth(string uid, WorldRegrowthData data)
+        public void AddWorldRegrowth(string uid, RegrowthData data)
         {
             world_regrowth[uid] = data;
         }
@@ -350,7 +351,7 @@ namespace SurvivalEngine
                 world_regrowth.Remove(uid);
         }
 
-        public WorldRegrowthData GetWorldRegrowth(string uid)
+        public RegrowthData GetWorldRegrowth(string uid)
         {
             if (world_regrowth.ContainsKey(uid))
                 return world_regrowth[uid];

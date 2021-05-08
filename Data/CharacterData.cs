@@ -20,10 +20,10 @@ namespace SurvivalEngine
 
         private static List<CharacterData> character_data = new List<CharacterData>();
 
-        public static void Load(string characters_folder)
+        public static new void Load()
         {
             character_data.Clear();
-            character_data.AddRange(Resources.LoadAll<CharacterData>(characters_folder));
+            character_data.AddRange(Resources.LoadAll<CharacterData>(""));
         }
 
         public new static CharacterData Get(string character_id)

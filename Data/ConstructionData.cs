@@ -29,10 +29,10 @@ namespace SurvivalEngine
             return durability_type != DurabilityType.None && durability >= 0.1f;
         }
 
-        public static void Load(string constructions_folder)
+        public static new void Load()
         {
             construction_data.Clear();
-            construction_data.AddRange(Resources.LoadAll<ConstructionData>(constructions_folder));
+            construction_data.AddRange(Resources.LoadAll<ConstructionData>(""));
         }
 
         public new static ConstructionData Get(string construction_id)

@@ -11,12 +11,6 @@ namespace SurvivalEngine
     [CreateAssetMenu(fileName = "AssetData", menuName = "SurvivalEngine/AssetData", order = 0)]
     public class AssetData : ScriptableObject
     {
-        [Header("Resources")]
-        public string items_folder = "Items";
-        public string constructions_folder = "Constructions";
-        public string plants_folder = "Plants";
-        public string characters_folder = "Characters";
-
         [Header("Systems Prefabs")]
         public GameObject ui_canvas;
         public GameObject ui_canvas_mobile;
