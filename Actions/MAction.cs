@@ -9,7 +9,7 @@ namespace SurvivalEngine
     /// Merge Action parent class: Any action that happens when mixing two items (ex: coconut and axe), or one item with a selectable (ex: raw food on top of fire)
     /// </summary>
 
-    public class MAction : SAction
+    public abstract class MAction : SAction
     {
         public GroupData merge_target;
 

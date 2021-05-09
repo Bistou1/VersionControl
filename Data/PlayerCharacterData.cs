@@ -14,6 +14,13 @@ namespace SurvivalEngine
     }
 
     [System.Serializable]
+    public class PlayerPetData
+    {
+        public string pet_id;
+        public string uid;
+    }
+
+    [System.Serializable]
     public class PlayerCharacterData
     {
         public int player_id;
@@ -27,6 +34,7 @@ namespace SurvivalEngine
         public Dictionary<string, int> crafted_count = new Dictionary<string, int>();
         public Dictionary<string, int> kill_count = new Dictionary<string, int>();
         public Dictionary<string, bool> unlocked_ids = new Dictionary<string, bool>();
+        public Dictionary<string, PlayerPetData> pets = new Dictionary<string, PlayerPetData>();
 
         public PlayerCharacterData(int id) { player_id = id; }
 
@@ -44,6 +52,9 @@ namespace SurvivalEngine
                 crafted_count = new Dictionary<string, int>();
             if (kill_count == null)
                 kill_count = new Dictionary<string, int>();
+
+            if (pets == null)
+                pets = new Dictionary<string, PlayerPetData>();
         }
 
         //--- Attributes ----
@@ -189,6 +200,21 @@ namespace SurvivalEngine
         public void ResetKillCount()
         {
             kill_count.Clear();
+        }
+
+        //----- Pet owned by player ----
+        public void AddPet(string uid, string pet_id)
+        {
+            PlayerPetData pet = new PlayerPetData();
+            pet.pet_id = pet_id;
+            pet.uid = uid;
+            pets[uid] = pet;
+        }
+
+        public void RemovePet(string uid)
+        {
+            if (pets.ContainsKey(uid))
+                pets.Remove(uid);
         }
 
         public static PlayerCharacterData Get(int player_id)

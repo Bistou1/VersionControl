@@ -9,7 +9,7 @@ namespace SurvivalEngine
     /// If you put more than 1, first AAction in the list that can be performed will be selected
     /// </summary>
     
-    public class AAction : SAction
+    public abstract class AAction : SAction
     {
         //When clicking on a Selectable in the scene
         public override void DoAction(PlayerCharacter character, Selectable select)

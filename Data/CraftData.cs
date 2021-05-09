@@ -5,12 +5,6 @@ using UnityEngine;
 namespace SurvivalEngine
 {
     /// <summary>
-    /// SData is the base scriptable object data for this engine
-    /// </summary>
-    [System.Serializable]
-    public abstract class SData : ScriptableObject { }
-
-    /// <summary>
     /// Crafting cost
     /// </summary>
 
@@ -27,11 +21,8 @@ namespace SurvivalEngine
     /// Parent data class for craftable items (items, constructions, plants)
     /// </summary>
 
-    public class CraftData : SData
+    public class CraftData : IdData
     {
-        [Header("--- CraftData ------------------")]
-        public string id;
-
         [Header("Display")]
         public string title;
         public Sprite icon;
@@ -210,9 +201,9 @@ namespace SurvivalEngine
             return Craftable.GetAllObjectsOf(data);
         }
 
-        public static GameObject Create(CraftData data, Vector3 pos, PlayerCharacter owner=null)
+        public static GameObject Create(CraftData data, Vector3 pos)
         {
-            return Craftable.Create(data, pos, owner);
+            return Craftable.Create(data, pos);
         }
     }
 }

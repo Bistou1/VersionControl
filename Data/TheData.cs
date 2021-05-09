@@ -25,6 +25,7 @@ namespace SurvivalEngine
             ConstructionData.Load();
             PlantData.Load();
             CharacterData.Load();
+            SpawnData.Load();
             
             //Load managers
             if (!FindObjectOfType<TheUI>())

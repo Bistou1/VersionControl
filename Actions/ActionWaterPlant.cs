@@ -27,8 +27,8 @@ namespace SurvivalEngine
                 else
                     character.Inventory.RemoveEquipItem(idata.equip_slot);
 
-                //Add to plant
-                plant.AddWater(character);
+                //Water plant
+                plant.Water();
 
                 string animation = character.Animation ? character.Animation.water_anim : "";
                 character.TriggerAnim(animation, plant.transform.position, 1f);

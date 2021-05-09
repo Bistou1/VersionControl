@@ -9,7 +9,7 @@ namespace SurvivalEngine
     /// Selectable Action parent class: Any action selected manually through the Action Selector (Items or Selectables)
     /// </summary>
 
-    public class SAction : ScriptableObject
+    public abstract class SAction : ScriptableObject
     {
         public string title;
 

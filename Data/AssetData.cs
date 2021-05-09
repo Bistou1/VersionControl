@@ -23,6 +23,7 @@ namespace SurvivalEngine
         [Header("FX")]
         public GameObject item_take_fx;
         public GameObject item_select_fx;
+        public GameObject item_drag_fx;
         public GameObject item_merge_fx;
         
 

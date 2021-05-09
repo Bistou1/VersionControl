@@ -49,6 +49,17 @@ namespace SurvivalEngine
     }
 
     [System.Serializable]
+    public class SpawnedData
+    {
+        public string id;
+        public string uid;
+        public string scene;
+        public Vector3Data pos;
+        public QuaternionData rot;
+        public float scale;
+    }
+
+    [System.Serializable]
     public class SceneObjectData
     {
         public string uid;
@@ -106,7 +117,9 @@ namespace SurvivalEngine
         public Dictionary<int, PlayerCharacterData> player_characters = new Dictionary<int, PlayerCharacterData>();
         public Dictionary<string, InventoryData> inventories = new Dictionary<string, InventoryData>();
 
-        public Dictionary<string, int> unique_ids = new Dictionary<string, int>();
+        public Dictionary<string, int> unique_ids = new Dictionary<string, int>(); //Unique ints
+        public Dictionary<string, float> unique_floats = new Dictionary<string, float>();
+        public Dictionary<string, string> unique_strings = new Dictionary<string, string>();
         public Dictionary<string, int> removed_objects = new Dictionary<string, int>(); //1 = removed
         public Dictionary<string, int> hidden_objects = new Dictionary<string, int>(); //1 = hidden
 
@@ -114,7 +127,8 @@ namespace SurvivalEngine
         public Dictionary<string, BuiltConstructionData> built_constructions = new Dictionary<string, BuiltConstructionData>();
         public Dictionary<string, SowedPlantData> sowed_plants = new Dictionary<string, SowedPlantData>();
         public Dictionary<string, TrainedCharacterData> trained_characters = new Dictionary<string, TrainedCharacterData>();
-        public Dictionary<string, SceneObjectData> scene_objects = new Dictionary<string, SceneObjectData>();
+        public Dictionary<string, SpawnedData> spawned_objects = new Dictionary<string, SpawnedData>(); //Objects spawned
+        public Dictionary<string, SceneObjectData> scene_objects = new Dictionary<string, SceneObjectData>(); //Objects already in scene but moved
         public Dictionary<string, RegrowthData> world_regrowth = new Dictionary<string, RegrowthData>();
         
         //-------------------
@@ -141,6 +155,10 @@ namespace SurvivalEngine
             //Fix data to make sure old save files compatible with new game version
             if (unique_ids == null)
                 unique_ids = new Dictionary<string, int>();
+            if (unique_floats == null)
+                unique_floats = new Dictionary<string, float>();
+            if (unique_strings == null)
+                unique_strings = new Dictionary<string, string>();
 
             if (player_characters == null)
                 player_characters = new Dictionary<int, PlayerCharacterData>();
@@ -159,6 +177,9 @@ namespace SurvivalEngine
                 sowed_plants = new Dictionary<string, SowedPlantData>();
             if (trained_characters == null)
                 trained_characters = new Dictionary<string, TrainedCharacterData>();
+
+            if (spawned_objects == null)
+                spawned_objects = new Dictionary<string, SpawnedData>();
             if (scene_objects == null)
                 scene_objects = new Dictionary<string, SceneObjectData>();
             if (world_regrowth == null)
@@ -338,6 +359,32 @@ namespace SurvivalEngine
             return null;
         }
 
+        public SpawnedData AddSpawnedObject(string id, string scene, Vector3 pos, Quaternion rot, float scale)
+        {
+            SpawnedData sdata = new SpawnedData();
+            sdata.id = id;
+            sdata.uid = UniqueID.GenerateUniqueID();
+            sdata.scene = scene;
+            sdata.pos = pos;
+            sdata.rot = rot;
+            sdata.scale = scale;
+            spawned_objects[sdata.uid] = sdata;
+            return sdata;
+        }
+
+        public void RemoveSpawnedObject(string uid)
+        {
+            if (spawned_objects.ContainsKey(uid))
+                spawned_objects.Remove(uid);
+        }
+
+        public SpawnedData GetSpawnedObject(string uid)
+        {
+            if (spawned_objects.ContainsKey(uid))
+                return spawned_objects[uid];
+            return null;
+        }
+
         //---- World Regrowth -----
 
         public void AddWorldRegrowth(string uid, RegrowthData data)
@@ -410,28 +457,76 @@ namespace SurvivalEngine
         }
 
         // ---- Unique Ids (Custom data) ----
-        public void SetCustomValue(string unique_id, int val)
+        public void SetCustomInt(string unique_id, int val)
         {
             if (!string.IsNullOrEmpty(unique_id))
                 unique_ids[unique_id] = val;
         }
 
-        public void RemoveCustomValue(string unique_id)
+        public void RemoveCustomInt(string unique_id)
         {
             if (unique_ids.ContainsKey(unique_id))
                 unique_ids.Remove(unique_id);
         }
 
-        public int GetCustomValue(string unique_id)
+        public int GetCustomInt(string unique_id)
         {
             if (unique_ids.ContainsKey(unique_id))
                 return unique_ids[unique_id];
             return 0;
         }
 
-        public bool HasCustomValue(string unique_id)
+        public bool HasCustomInt(string unique_id)
         {
             return unique_ids.ContainsKey(unique_id);
+        }
+
+        public void SetCustomFloat(string unique_id, float val)
+        {
+            if (!string.IsNullOrEmpty(unique_id))
+                unique_floats[unique_id] = val;
+        }
+
+        public void RemoveCustomFloat(string unique_id)
+        {
+            if (unique_floats.ContainsKey(unique_id))
+                unique_floats.Remove(unique_id);
+        }
+
+        public float GetCustomFloat(string unique_id)
+        {
+            if (unique_floats.ContainsKey(unique_id))
+                return unique_floats[unique_id];
+            return 0;
+        }
+
+        public bool HasCustomFloat(string unique_id)
+        {
+            return unique_floats.ContainsKey(unique_id);
+        }
+
+        public void SetCustomString(string unique_id, string val)
+        {
+            if (!string.IsNullOrEmpty(unique_id))
+                unique_strings[unique_id] = val;
+        }
+
+        public void RemoveCustomString(string unique_id)
+        {
+            if (unique_strings.ContainsKey(unique_id))
+                unique_strings.Remove(unique_id);
+        }
+
+        public string GetCustomString(string unique_id)
+        {
+            if (unique_strings.ContainsKey(unique_id))
+                return unique_strings[unique_id];
+            return "";
+        }
+
+        public bool HasCustomString(string unique_id)
+        {
+            return unique_strings.ContainsKey(unique_id);
         }
 
         // ---- Multi-inventory Items -----

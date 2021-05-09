@@ -17,11 +17,13 @@ namespace SurvivalEngine
         [TextArea(1, 2)]
         public string unique_id; //The unique ID, should be empty in the prefab. Should only be added to instances in the scene. Can be automatically generated
 
+        private Dictionary<string, string> sub_dict = new Dictionary<string, string>();
+
         private static Dictionary<string, UniqueID> dict_id = new Dictionary<string, UniqueID>();
 
         void Awake()
         {
-            if (unique_id != "")
+            if (!string.IsNullOrEmpty(unique_id))
             {
                 dict_id[unique_id] = this;
             }
@@ -53,19 +55,14 @@ namespace SurvivalEngine
             gameObject.SetActive(true);
         }
 
-        public void SetValue(int value)
+        public void SetUID(string uid)
         {
-            PlayerData.Get().SetCustomValue(unique_id, value);
-        }
-
-        public int GetValue()
-        {
-            return PlayerData.Get().GetCustomValue(unique_id);
-        }
-
-        public bool HasValue()
-        {
-            return PlayerData.Get().HasCustomValue(unique_id);
+            if (dict_id.ContainsKey(unique_id))
+                dict_id.Remove(unique_id);
+            unique_id = uid;
+            if (!string.IsNullOrEmpty(unique_id))
+                dict_id[unique_id] = this;
+            sub_dict.Clear();
         }
 
         public bool HasUID()
@@ -75,7 +72,24 @@ namespace SurvivalEngine
 
         public void GenerateUID()
         {
-            unique_id = uid_prefix + GenerateUniqueID();
+            SetUID(uid_prefix + GenerateUniqueID());
+        }
+
+        public void GenerateUIDEditor()
+        {
+            unique_id = uid_prefix + GenerateUniqueID(); //Dont save to dict in editor mode
+        }
+
+        public string GetSubUID(string sub_tag)
+        {
+            if (sub_dict.ContainsKey(sub_tag))
+                return sub_dict[sub_tag]; //Dict prevents GC alloc
+            if (string.IsNullOrEmpty(unique_id))
+                return ""; //No UID
+
+            string sub_uid = unique_id + "_" + sub_tag;
+            sub_dict[sub_tag] = sub_uid;
+            return sub_uid;
         }
 
         public static string GenerateUniqueID(int min=11, int max=17)
