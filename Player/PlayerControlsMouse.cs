@@ -42,6 +42,7 @@ namespace SurvivalEngine
         private Vector3 floor_pos; //World position the floor pointing at
 
         private bool joystick_active = false;
+        private bool joystick_over_ui = false;
         private Vector3 joystick_pos;
         private Vector3 joystick_dir;
 
@@ -144,6 +145,7 @@ namespace SurvivalEngine
                     joystick_pos = Input.mousePosition;
                     joystick_dir = Vector2.zero;
                     joystick_active = false;
+                    joystick_over_ui = IsMouseOverUI();
                 }
 
                 if (!Input.GetMouseButton(0))
@@ -152,7 +154,7 @@ namespace SurvivalEngine
                     joystick_dir = Vector2.zero;
                 }
 
-                if (Input.GetMouseButton(0))
+                if (Input.GetMouseButton(0) && !joystick_over_ui)
                 {
                     Vector3 distance = Input.mousePosition - joystick_pos;
                     distance.z = 0f;
@@ -448,6 +450,13 @@ namespace SurvivalEngine
         private Ray GetMouseCameraRay()
         {
             return TheCamera.GetCamera().ScreenPointToRay(GetClampMousePos());
+        }
+
+        //Get world position of the mouse
+        public Vector3 GetMouseWorldPosition()
+        {
+            Vector3 mouse = new Vector3(Input.mousePosition.x, Input.mousePosition.y, 10f);
+            return TheCamera.GetCamera().ScreenToWorldPoint(mouse);
         }
 
         //Check if mouse is on top of any UI element

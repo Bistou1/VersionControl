@@ -11,7 +11,6 @@ namespace SurvivalEngine
     /// </summary>
 
     [RequireComponent(typeof(Rigidbody))]
-    [RequireComponent(typeof(CapsuleCollider))]
     [RequireComponent(typeof(PlayerCharacterCombat))]
     [RequireComponent(typeof(PlayerCharacterAttribute))]
     [RequireComponent(typeof(PlayerCharacterInventory))]
@@ -42,6 +41,7 @@ namespace SurvivalEngine
         private PlayerCharacterInventory character_inventory;
         private PlayerCharacterJump character_jump;
         private PlayerCharacterSwim character_swim;
+        private PlayerCharacterClimb character_climb;
         private PlayerCharacterAnim character_anim;
 
         private Vector3 move;
@@ -98,6 +98,7 @@ namespace SurvivalEngine
             character_inventory = GetComponent<PlayerCharacterInventory>();
             character_jump = GetComponent<PlayerCharacterJump>();
             character_swim = GetComponent<PlayerCharacterSwim>();
+            character_climb = GetComponent<PlayerCharacterClimb>();
             character_anim = GetComponent<PlayerCharacterAnim>();
             facing = transform.forward;
             prev_pos = transform.position;
@@ -202,41 +203,43 @@ namespace SurvivalEngine
             DetectGrounded();
 
             //Add Falling to the move vector
-            if (!is_grounded || IsJumping())
-            {
-                if (!IsJumping())
-                    fall_vect = Vector3.MoveTowards(fall_vect, Vector3.down * fall_speed, fall_gravity * Time.fixedDeltaTime);
-                tmove += fall_vect;
-            }
-            //Add slope angle
-            else if(is_grounded)
-            {
-                tmove = Vector3.ProjectOnPlane(tmove.normalized, ground_normal).normalized * tmove.magnitude;
-            }
+            if (!IsClimbing() && !IsRiding()){
+                if (!is_grounded || IsJumping())
+                {
+                    if (!IsJumping())
+                        fall_vect = Vector3.MoveTowards(fall_vect, Vector3.down * fall_speed, fall_gravity * Time.fixedDeltaTime);
+                    tmove += fall_vect;
+                }
+                //Add slope angle
+                else if (is_grounded)
+                {
+                    tmove = Vector3.ProjectOnPlane(tmove.normalized, ground_normal).normalized * tmove.magnitude;
+                }
+                
+                //Apply the move calculated previously
+                move = Vector3.Lerp(move, tmove, move_accel * Time.fixedDeltaTime);
+                rigid.velocity = move;
 
-            //Apply the move calculated previously
-            move = Vector3.Lerp(move, tmove, move_accel * Time.fixedDeltaTime);
-            rigid.velocity = move;
+                //Calculate Facing
+                if (!is_action && IsMoving())
+                {
+                    facing = new Vector3(move.x, 0f, move.z).normalized;
+                }
 
-            //Calculate Facing
-            if (!is_action && IsMoving())
-            {
-                facing = new Vector3(move.x, 0f, move.z).normalized;
+                //Rotate character with right joystick when not in free rotate mode
+                bool freerotate = TheCamera.Get().IsFreeRotation();
+                if (!is_action && !freerotate && controls.IsGamePad())
+                {
+                    Vector2 look = controls.GetFreelook();
+                    Vector3 look3 = TheCamera.Get().GetRotation() * new Vector3(look.x, 0f, look.y);
+                    if(look3.magnitude > 0.5f)
+                        facing = look3.normalized;
+                }
+
+                //Apply the facing
+                Quaternion targ_rot = Quaternion.LookRotation(facing, Vector3.up);
+                rigid.MoveRotation(Quaternion.RotateTowards(rigid.rotation, targ_rot, rotate_speed * Time.fixedDeltaTime));
             }
-
-            //Rotate character with right joystick when not in free rotate mode
-            bool freerotate = TheCamera.Get().IsFreeRotation();
-            if (!is_action && !freerotate && controls.IsGamePad())
-            {
-                Vector2 look = controls.GetFreelook();
-                Vector3 look3 = TheCamera.Get().GetRotation() * new Vector3(look.x, 0f, look.y);
-                if(look3.magnitude > 0.5f)
-                    facing = look3.normalized;
-            }
-
-            //Apply the facing
-            Quaternion targ_rot = Quaternion.LookRotation(facing, Vector3.up);
-            rigid.MoveRotation(Quaternion.RotateTowards(rigid.rotation, targ_rot, rotate_speed * Time.fixedDeltaTime));
 
             //Fronted (need to be done after facing to avoid issues)
             DetectFronted();
@@ -575,11 +578,11 @@ namespace SurvivalEngine
         public void InteractWith(Selectable selectable, Vector3 pos)
         {
             bool can_interact = selectable.CanBeInteracted();
-            bool surface = selectable.type == SelectableType.InteractSurface || !can_interact;
+            Vector3 tpos = selectable.GetClosestInteractPoint(transform.position, pos);
 
             auto_move_select = can_interact ? selectable : null;
-            auto_move_target = surface ? pos : selectable.transform.position;
-            auto_move_target_next = surface ? pos : selectable.transform.position;
+            auto_move_target = tpos;
+            auto_move_target_next = tpos;
 
             auto_move = true;
             auto_move_drop = -1;
@@ -900,6 +903,11 @@ namespace SurvivalEngine
             return character_swim != null && character_swim.IsSwimming();
         }
 
+        public bool IsClimbing()
+        {
+            return character_climb != null && character_climb.IsClimbing();
+        }
+
         public bool IsDoingAction()
         {
             return is_action;
@@ -919,6 +927,8 @@ namespace SurvivalEngine
         {
             if (is_riding && riding_animal != null)
                 return riding_animal.IsMoving();
+            if(Climbing && Climbing.IsClimbing())
+                return Climbing.IsMoving();
 
             Vector3 moveXZ = new Vector3(move.x, 0f, move.z);
             return moveXZ.magnitude > GetMoveSpeed() * moving_threshold;
@@ -1009,6 +1019,11 @@ namespace SurvivalEngine
         public PlayerCharacterSwim Swimming
         {
             get { return character_swim; } //Can be null
+        }
+
+        public PlayerCharacterClimb Climbing
+        {
+            get { return character_climb; } //Can be null
         }
 
         public PlayerCharacterAnim Animation

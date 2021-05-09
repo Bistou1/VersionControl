@@ -89,18 +89,6 @@ namespace SurvivalEngine.EditorTool
                         Debug.Log("Added PlayerCharacterCraft Component to: " + prefab_path);
                     }
 
-                    //Fix selectable
-                    Selectable selectable = prefab.GetComponent<Selectable>();
-                    if (selectable != null)
-                    {
-                        if (selectable.surface && selectable.type == SelectableType.Interact)
-                        {
-                            selectable.type = SelectableType.InteractSurface;
-                            EditorUtility.SetDirty(prefab);
-                            Debug.Log("Changed seletable type to " + selectable.type + " on: " + prefab_path);
-                        }
-                    }
-
                     //Remove Anywhere mode in Buildable
                     Buildable buildable = prefab.GetComponent<Buildable>();
                     if (buildable != null)

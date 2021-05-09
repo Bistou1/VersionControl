@@ -31,7 +31,7 @@ namespace SurvivalEngine.EditorTool
             if (GUILayout.Button("Generate UID"))
             {
                 Undo.RecordObject(myScript, "Generate UID");
-                myScript.GenerateUID();
+                myScript.GenerateUIDEditor();
                 EditorUtility.SetDirty(myScript);
             }
 

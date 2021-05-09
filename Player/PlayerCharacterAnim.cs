@@ -29,6 +29,7 @@ namespace SurvivalEngine
         public string hoe_anim = "Hoe";
         public string ride_anim = "Ride";
         public string swim_anim = "Swim";
+        public string climb_anim = "Climb";
 
         private PlayerCharacter character;
         private Animator animator;
@@ -72,6 +73,7 @@ namespace SurvivalEngine
                 animator.SetBool(fish_anim, character.IsFishing());
                 animator.SetBool(ride_anim, character.IsRiding());
                 animator.SetBool(swim_anim, character.IsSwimming());
+                animator.SetBool(climb_anim, character.IsClimbing());
 
                 float mangle = Vector3.SignedAngle(character.GetFacing(), character.GetMove(), Vector3.up);
                 Vector3 move_side = new Vector3(Mathf.Sin(mangle * Mathf.Deg2Rad), 0f, Mathf.Cos(mangle * Mathf.Deg2Rad));
