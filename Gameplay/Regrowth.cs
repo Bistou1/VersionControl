@@ -11,14 +11,14 @@ namespace SurvivalEngine
     }
 
     /// <summary>
-    /// Attach this to a Item or Plant or Character to have it respawn automatically on death
+    /// Attach this to an object to have it respawn automatically on death
     /// </summary>
 
-    [RequireComponent(typeof(Craftable))]
     [RequireComponent(typeof(UniqueID))]
     public class Regrowth : MonoBehaviour
     {
         public RegrowthType type; //When will it try to spawn a new one? on death or when created?
+        public IdData spawn_data; //Object that will be spawned, if null, will use the data already set on the Spawnable/Item/Construction/Plant
         public float range = 10f; //Range around original object where it can regrow
         public int max = 5; //Wont regrow if already this amount of same object in range
         public float probability = 0.5f; //Probability to regrow 1 on death
@@ -28,23 +28,23 @@ namespace SurvivalEngine
         public bool random_scale = false; //If true, scale will be resized by a value between -0.25 and +0.25
 
         private UniqueID unique_id;
-        private Craftable craftable;
+        private SObject sobject;
         private Destructible destruct; //Can be null
         private Item item; //Can be null
 
         private void Awake()
         {
             unique_id = GetComponent<UniqueID>();
-            craftable = GetComponent<Craftable>();
+            sobject = GetComponent<SObject>();
             destruct = GetComponent<Destructible>();
             item = GetComponent<Item>();
 
             if (type == RegrowthType.OnDeath)
             {
                 if (destruct != null)
-                    destruct.onDeath += SpawnRegrow;
+                    destruct.onDeath += CreateRegrowth;
                 if (item != null)
-                    item.onDestroy += SpawnRegrow;
+                    item.onDestroy += CreateRegrowth;
             }
         }
 
@@ -52,16 +52,17 @@ namespace SurvivalEngine
         {
             if (type == RegrowthType.OnCreate)
             {
-                SpawnRegrow();
+                CreateRegrowth();
             }
         }
 
-        private void SpawnRegrow() {
+        private void CreateRegrowth()
+        {
 
-            CraftData data = craftable.GetData();
+            IdData data = spawn_data != null ? spawn_data : sobject?.GetData();
             if (data != null && !string.IsNullOrEmpty(unique_id.unique_id) && !PlayerData.Get().HasWorldRegrowth(unique_id.unique_id))
             {
-                int nb = Craftable.CountObjectInRadius(data, transform.position, range);
+                int nb = SObject.CountSceneObjects(data, transform.position, range);
                 if (nb < max)
                 {
                     //Find position
@@ -75,7 +76,7 @@ namespace SurvivalEngine
                         if (random_scale)
                             scale = Random.Range(0.75f, 1.25f);
 
-                        CreateRegrowthData(unique_id.unique_id, data, SceneNav.GetCurrentScene(), position, rotation, scale, duration, probability);
+                        CreateRegrowthData(unique_id.unique_id, data.id, SceneNav.GetCurrentScene(), position, rotation, scale, duration, probability);
                     }
                 }
             }
@@ -86,7 +87,8 @@ namespace SurvivalEngine
             int nbtry = 0;
             bool valid = false;
             Vector3 position = transform.position;
-            while (!valid && nbtry < 10) { //Try find a valid position 10 times
+            while (!valid && nbtry < 10)
+            { //Try find a valid position 10 times
                 position = transform.position;
                 float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
                 float radius = Random.Range(0f, range);
@@ -116,25 +118,33 @@ namespace SurvivalEngine
         //Spawn the prefab from existin regrowth data, after its timer reaches the duration
         public static GameObject SpawnRegrowth(RegrowthData data)
         {
-            CraftData craftable = CraftData.Get(data.data_id);
-            if (craftable != null && data.scene == SceneNav.GetCurrentScene())
+            if (Random.value < data.probability)
             {
-                if (Random.value < data.probability)
+                CraftData cdata = CraftData.Get(data.data_id);
+                SpawnData sdata = SpawnData.Get(data.data_id);
+
+                if (cdata != null && data.scene == SceneNav.GetCurrentScene())
                 {
-                    GameObject nobj = Craftable.Create(craftable, data.pos);
+                    GameObject nobj = Craftable.Create(cdata, data.pos);
                     nobj.transform.rotation = data.rot;
                     nobj.transform.localScale = nobj.transform.localScale * data.scale;
                     return nobj;
                 }
+
+                else if (sdata != null && data.scene == SceneNav.GetCurrentScene())
+                {
+                    return Spawnable.Create(sdata, data.pos, data.rot, data.scale);
+                }
             }
+
             return null;
         }
 
         //Create regrowth data after an object dies
-        public static RegrowthData CreateRegrowthData(string uid, CraftData item, string scene, Vector3 pos, Quaternion rot, float scale, float duration, float probability)
+        public static RegrowthData CreateRegrowthData(string uid, string id, string scene, Vector3 pos, Quaternion rot, float scale, float duration, float probability)
         {
             RegrowthData data = new RegrowthData();
-            data.data_id = item.id;
+            data.data_id = id;
             data.uid = uid;
             data.scene = scene;
             data.pos = pos;

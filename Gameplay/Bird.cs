@@ -222,7 +222,7 @@ namespace SurvivalEngine
                     Vector3 dir = (selectable.transform.position - pos);
                     if (dir.magnitude < detect_range)
                     {
-                        Character character = selectable.GetComponent<Character>();
+                        Character character = selectable.GetCharacter();
                         if (character && character.attack_enabled) //Only afraid if the character can attack
                         {
                             if (character.GetDestructible().team_group != this.destruct.team_group)

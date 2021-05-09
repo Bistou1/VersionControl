@@ -87,14 +87,14 @@ namespace SurvivalEngine
                 fruit_model.gameObject.SetActive(false);
 
             //Fruit
-            if (PlayerData.Get().HasCustomValue(GetFruitUID()))
-                has_fruit = PlayerData.Get().GetCustomValue(GetFruitUID()) > 0;
+            if (PlayerData.Get().HasCustomInt(GetSubUID("fruit")))
+                has_fruit = PlayerData.Get().GetCustomInt(GetSubUID("fruit")) > 0;
 
             //Progress
-            if (PlayerData.Get().HasCustomValue(GetProgressUID()))
+            if (PlayerData.Get().HasCustomFloat(GetSubUID("progress")))
             {
-                growth_progress = PlayerData.Get().GetCustomValue(GetProgressUID());
-                fruit_progress = PlayerData.Get().GetCustomValue(GetProgressUID());
+                growth_progress = PlayerData.Get().GetCustomFloat(GetSubUID("progress"));
+                fruit_progress = PlayerData.Get().GetCustomFloat(GetSubUID("progress"));
             }
         }
 
@@ -111,7 +111,7 @@ namespace SurvivalEngine
             if (!IsFullyGrown() && grow_time > 0.001f)
             {
                 growth_progress += game_speed * boost_mult * Time.deltaTime;
-                PlayerData.Get().SetCustomValue(GetProgressUID(), Mathf.RoundToInt(growth_progress));
+                PlayerData.Get().SetCustomFloat(GetSubUID("progress"), growth_progress);
 
                 if (growth_progress > grow_time)
                 {
@@ -123,7 +123,7 @@ namespace SurvivalEngine
             if (!has_fruit && fruit != null)
             {
                 fruit_progress += game_speed * boost_mult * Time.deltaTime;
-                PlayerData.Get().SetCustomValue(GetProgressUID(), Mathf.RoundToInt(fruit_progress));
+                PlayerData.Get().SetCustomFloat(GetSubUID("progress"), fruit_progress);
 
                 if (fruit_progress > fruit_grow_time)
                 {
@@ -139,6 +139,10 @@ namespace SurvivalEngine
                 if (boost_timer <= 0.01f)
                     boost_mult = 1f;
             }
+
+            //Water 
+            if (!HasWater() && TheGame.Get().IsWeather(WeatherEffect.Rain))
+                Water();
 
             //Display
             if (fruit_model != null && has_fruit != fruit_model.gameObject.activeSelf)
@@ -173,7 +177,7 @@ namespace SurvivalEngine
                 }
 
                 growth_progress = 0f;
-                PlayerData.Get().SetCustomValue(GetProgressUID(), 0);
+                PlayerData.Get().SetCustomFloat(GetSubUID("progress"), 0f);
                 plant_list.Remove(this); //Remove from list so spawn works!
 
                 Spawn(sdata.uid);
@@ -185,11 +189,11 @@ namespace SurvivalEngine
         {
             has_fruit = true;
             fruit_progress = 0f;
-            PlayerData.Get().SetCustomValue(GetFruitUID(), 1);
-            PlayerData.Get().SetCustomValue(GetProgressUID(), 0);
+            PlayerData.Get().SetCustomInt(GetSubUID("fruit"), 1);
+            PlayerData.Get().SetCustomFloat(GetSubUID("progress"), 0f);
         }
 
-        public void AddWater(PlayerCharacter character)
+        public void Water()
         {
             boost_mult = (1f + water_grow_boost);
             boost_timer = water_duration;
@@ -217,7 +221,7 @@ namespace SurvivalEngine
         public void RemoveFruit()
         {
             has_fruit = false;
-            PlayerData.Get().SetCustomValue(GetFruitUID(), 0);
+            PlayerData.Get().SetCustomInt(GetSubUID("fruit"), 0);
         }
 
         public void Kill()
@@ -285,21 +289,7 @@ namespace SurvivalEngine
         {
             return destruct.IsDead();
         }
-
-        public string GetFruitUID()
-        {
-            if (!string.IsNullOrEmpty(unique_id.unique_id))
-                return unique_id.unique_id + "_fruit";
-            return "";
-        }
-
-        public string GetProgressUID()
-        {
-            if (!string.IsNullOrEmpty(unique_id.unique_id))
-                return unique_id.unique_id + "_progress";
-            return "";
-        }
-
+        
         public bool HasUID()
         {
             return !string.IsNullOrEmpty(unique_id.unique_id);
@@ -308,6 +298,11 @@ namespace SurvivalEngine
         public string GetUID()
         {
             return unique_id.unique_id;
+        }
+
+        public string GetSubUID(string tag)
+        {
+            return unique_id.GetSubUID(tag);
         }
 
         public bool HasGroup(GroupData group)

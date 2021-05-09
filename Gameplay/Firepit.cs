@@ -60,8 +60,8 @@ namespace SurvivalEngine
 
             if (!construction.was_spawned && !buildable.IsBuilding())
                 fuel = start_fuel;
-            if (PlayerData.Get().HasCustomValue(GetFireUID()))
-                fuel = PlayerData.Get().GetCustomValue(GetFireUID());
+            if (PlayerData.Get().HasCustomFloat(GetFireUID()))
+                fuel = PlayerData.Get().GetCustomFloat(GetFireUID());
         }
 
         void Update()
@@ -74,7 +74,7 @@ namespace SurvivalEngine
                 float game_speed = TheGame.Get().GetGameTimeSpeedPerSec();
                 fuel -= game_speed * Time.deltaTime;
 
-                PlayerData.Get().SetCustomValue(GetFireUID(), Mathf.RoundToInt(fuel));
+                PlayerData.Get().SetCustomFloat(GetFireUID(), fuel);
             }
 
             is_on = fuel > 0f;
@@ -97,7 +97,7 @@ namespace SurvivalEngine
             fuel += value;
             is_on = fuel > 0f;
 
-            PlayerData.Get().SetCustomValue(GetFireUID(), Mathf.RoundToInt(fuel));
+            PlayerData.Get().SetCustomFloat(GetFireUID(), fuel);
         }
 
         private void OnBuild()

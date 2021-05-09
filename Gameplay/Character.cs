@@ -60,6 +60,7 @@ namespace SurvivalEngine
         private Collider[] colliders;
         private Vector3 bounds_extent;
         private Vector3 bounds_center_offset;
+        private string current_scene;
 
         private Vector3 moving;
         private Vector3 facing;
@@ -116,6 +117,7 @@ namespace SurvivalEngine
             avoid_side = Random.value < 0.5f ? 1f : -1f;
             facing = transform.forward;
             use_navmesh = move_enabled && use_navmesh;
+            current_scene = SceneNav.GetCurrentScene();
 
             move_target = transform.position;
             move_target_avoid = transform.position;
@@ -152,7 +154,7 @@ namespace SurvivalEngine
 
             //Set current position
             SceneObjectData sobj = PlayerData.Get().GetSceneObject(GetUID());
-            if (sobj != null && sobj.scene == SceneNav.GetCurrentScene())
+            if (sobj != null && sobj.scene == current_scene)
             {
                 transform.position = sobj.pos;
                 transform.rotation = sobj.rot;
@@ -287,7 +289,7 @@ namespace SurvivalEngine
             }
 
             //Save position
-            PlayerData.Get().SetCharacterPosition(GetUID(), SceneNav.GetCurrentScene(), transform.position, transform.rotation);
+            PlayerData.Get().SetCharacterPosition(GetUID(), current_scene, transform.position, transform.rotation);
 
             //Stop moving
             if (is_moving && !HasTarget() && HasReachedMoveTarget(moving_threshold * 2f))
@@ -348,8 +350,6 @@ namespace SurvivalEngine
                     if (attack_timer > attack_cooldown)
                     {
                         Vector3 targ_dir = (target.transform.position - transform.position);
-                        targ_dir.y = 0f;
-
                         if (targ_dir.magnitude < GetAttackTargetHitRange())
                         {
                             is_attacking = true;
@@ -624,7 +624,7 @@ namespace SurvivalEngine
         {
             if (data != null)
             {
-                TrainedCharacterData cdata = PlayerData.Get().AddCharacter(data.id, SceneNav.GetCurrentScene(), transform.position, transform.rotation);
+                TrainedCharacterData cdata = PlayerData.Get().AddCharacter(data.id, current_scene, transform.position, transform.rotation);
                 unique_id.unique_id = cdata.uid;
             }
         }
@@ -782,6 +782,11 @@ namespace SurvivalEngine
             return unique_id.unique_id;
         }
 
+        public string GetSubUID(string tag)
+        {
+            return unique_id.GetSubUID(tag);
+        }
+
         public bool HasGroup(GroupData group)
         {
             if (data != null)
@@ -916,19 +921,18 @@ namespace SurvivalEngine
         public static Character Create(CharacterData data, Vector3 pos)
         {
             Quaternion rot = Quaternion.Euler(0f, 180f, 0f);
+            Character unit = Create(data, pos, rot);
+            return unit;
+        }
+
+        public static Character Create(CharacterData data, Vector3 pos, Quaternion rot)
+        {
             TrainedCharacterData ditem = PlayerData.Get().AddCharacter(data.id, SceneNav.GetCurrentScene(), pos, rot);
             GameObject build = Instantiate(data.character_prefab, pos, rot);
             Character unit = build.GetComponent<Character>();
             unit.data = data;
             unit.was_spawned = true;
             unit.unique_id.unique_id = ditem.uid;
-            return unit;
-        }
-
-        public static Character Create(CharacterData data, Vector3 pos, Quaternion rot)
-        {
-            Character unit = Create(data, pos);
-            unit.transform.rotation = rot;
             return unit;
         }
     }

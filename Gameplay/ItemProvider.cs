@@ -37,8 +37,8 @@ namespace SurvivalEngine
 
         private void Start()
         {
-            if (PlayerData.Get().HasCustomValue(GetAmountUID()))
-                nb_item = PlayerData.Get().GetCustomValue(GetAmountUID());
+            if (PlayerData.Get().HasCustomInt(GetAmountUID()))
+                nb_item = PlayerData.Get().GetCustomInt(GetAmountUID());
 
             if (auto_take)
                 GetComponent<Selectable>().onUse += OnUse;
@@ -58,7 +58,7 @@ namespace SurvivalEngine
                 nb_item += 1;
                 nb_item = Mathf.Min(nb_item, item_max);
 
-                PlayerData.Get().SetCustomValue(GetAmountUID(), nb_item);
+                PlayerData.Get().SetCustomInt(GetAmountUID(), nb_item);
             }
 
             for (int i = 0; i < item_models.Length; i++)
@@ -74,7 +74,7 @@ namespace SurvivalEngine
             if (nb_item > 0)
                 nb_item--;
 
-            PlayerData.Get().SetCustomValue(GetAmountUID(), nb_item);
+            PlayerData.Get().SetCustomInt(GetAmountUID(), nb_item);
         }
 
         public void GainItem(PlayerCharacter player, int quantity = 1)

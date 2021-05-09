@@ -28,8 +28,8 @@ namespace SurvivalEngine
 
         private void Start()
         {
-            if (PlayerData.Get().HasCustomValue(GetTimerUID()))
-                spawn_timer = PlayerData.Get().GetCustomValue(GetTimerUID());
+            if (PlayerData.Get().HasCustomFloat(GetTimerUID()))
+                spawn_timer = PlayerData.Get().GetCustomFloat(GetTimerUID());
         }
 
         void Update()
@@ -40,7 +40,7 @@ namespace SurvivalEngine
             float game_speed = TheGame.Get().GetGameTimeSpeedPerSec();
             spawn_timer += game_speed * Time.deltaTime;
 
-            PlayerData.Get().SetCustomValue(GetTimerUID(), Mathf.RoundToInt(spawn_timer));
+            PlayerData.Get().SetCustomFloat(GetTimerUID(), spawn_timer);
 
             if (spawn_timer > spawn_interval)
             {

@@ -10,7 +10,7 @@ namespace SurvivalEngine
 
     [RequireComponent(typeof(Selectable))]
     [RequireComponent(typeof(UniqueID))]
-    public abstract class Craftable : MonoBehaviour
+    public abstract class Craftable : SObject
     {
         private Selectable cselect;
 
@@ -28,7 +28,7 @@ namespace SurvivalEngine
         }
 
         //Get the data based on which type of object it is
-        public CraftData GetData()
+        public new CraftData GetData()
         {
             if (this is Item)
                 return ((Item)this).data;
@@ -79,7 +79,7 @@ namespace SurvivalEngine
 
         public static int CountSceneObjects(CraftData data)
         {
-            return CountObjectInRadius(data, Vector3.zero, float.MaxValue); //All objects in scene
+            return CountSceneObjects(data, Vector3.zero, float.MaxValue); //All objects in scene
         }
 
         public static int CountSceneObjects(CraftData data, Vector3 pos, float range)
@@ -143,11 +143,9 @@ namespace SurvivalEngine
 
         public static GameObject Create(CraftData data, Vector3 pos)
         {
-            return Create(data, pos, null); //Owned by nature/npc
-        }
+            if (data == null)
+                return null;
 
-        public static GameObject Create(CraftData data, Vector3 pos, PlayerCharacter owner)
-        {
             if (data is ItemData)
             {
                 ItemData item = (ItemData)data;

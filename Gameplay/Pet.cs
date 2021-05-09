@@ -24,6 +24,7 @@ namespace SurvivalEngine
     [RequireComponent(typeof(Selectable))]
     [RequireComponent(typeof(Destructible))]
     [RequireComponent(typeof(Character))]
+    [RequireComponent(typeof(UniqueID))]
     public class Pet : MonoBehaviour
     {
         [Header("Actions")]
@@ -40,15 +41,18 @@ namespace SurvivalEngine
 
         private Character character;
         private Destructible destruct;
+        private UniqueID unique_id;
 
         private PetState state;
         private Vector3 start_pos;
         private Animator animator;
 
-        private PlayerCharacter player_target = null;
         private Destructible attack_target = null;
         private GameObject action_target = null;
+        private Vector3 wander_target;
 
+        private int master_player = -1;
+        private bool follow = false;
         private float state_timer = 0f;
         private bool force_action = false;
 
@@ -56,14 +60,31 @@ namespace SurvivalEngine
         {
             character = GetComponent<Character>();
             destruct = GetComponent<Destructible>();
+            unique_id = GetComponent<UniqueID>();
             animator = GetComponentInChildren<Animator>();
             start_pos = transform.position;
+            wander_target = transform.position;
 
             character.onAttack += OnAttack;
             destruct.onDamaged += OnTakeDamage;
             destruct.onDeath += OnKill;
 
             transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+        }
+
+        private void Start()
+        {
+            if (PlayerData.Get().IsObjectRemoved(GetUID()))
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            if (PlayerData.Get().HasCustomInt(unique_id.GetSubUID("master")))
+            {
+                master_player = PlayerData.Get().GetCustomInt(unique_id.GetSubUID("master"));
+                Follow();
+            }
         }
 
         private void Update()
@@ -79,23 +100,28 @@ namespace SurvivalEngine
             //States
             if (state == PetState.Idle)
             {
-                if (state_timer > 2f)
+                if (follow && state_timer > 2f && HasMaster())
+                    ChangeState(PetState.Follow);
+
+                if (state_timer > 5f)
                 {
-                    if (HasFollowTarget())
-                    {
-                        ChangeState(PetState.Follow);
-                    }
-                    else
-                    {
-                        DetectPlayer();
-                    }
+                    state_timer = Random.Range(-1f, 1f);
+                    FindWanderTarget();
+                    character.MoveTo(wander_target);
                 }
+
+                //Character stuck
+                if (character.IsStuck())
+                    character.Stop();
             }
 
             if (state == PetState.Follow)
             {
-                if(!IsMoving() && PlayerIsFar(follow_range))
-                    character.Follow(player_target.gameObject);
+                if(HasMaster() && !IsMoving() && PlayerIsFar(follow_range))
+                    character.Follow(GetMaster().gameObject);
+
+                if (!follow)
+                    ChangeState(PetState.Idle);
 
                 DetectAction();
             }
@@ -150,7 +176,7 @@ namespace SurvivalEngine
             {
                 if (state_timer > 2f)
                 {
-                    if (HasFollowTarget())
+                    if (HasMaster())
                         ChangeState(PetState.Follow);
                     else
                         ChangeState(PetState.Idle);
@@ -181,21 +207,6 @@ namespace SurvivalEngine
             }
 
             StopAction();
-        }
-
-        //Detect if the player is in vision
-        private void DetectPlayer()
-        {
-            foreach (PlayerCharacter player in PlayerCharacter.GetAll())
-            {
-                Vector3 char_dir = (player.transform.position - transform.position);
-                if (char_dir.magnitude < detect_range)
-                {
-                    StopAction();
-                    player_target = player;
-                    ChangeState(PetState.Follow);
-                }
-            }
         }
 
         private void DetectAction()
@@ -235,15 +246,67 @@ namespace SurvivalEngine
             }
         }
 
-        public void PetPet(PlayerCharacter character)
+        public void PetPet()
         {
             StopAction();
-            player_target = character;
-            attack_target = null;
-            action_target = null;
             ChangeState(PetState.Pet);
             if (animator != null)
                 animator.SetTrigger("Pet");
+        }
+
+        public void TamePet(PlayerCharacter player)
+        {
+            if (player != null && character.data != null && !HasMaster() && unique_id.HasUID())
+            {
+                PetPet();
+                follow = true;
+
+                //Create a new character so that the pet can change scene
+                string prev_uid = unique_id.unique_id;
+                TrainedCharacterData prev_cdata = PlayerData.Get().GetCharacter(prev_uid);
+                if (prev_cdata == null)
+                {
+                    TrainedCharacterData cdata = PlayerData.Get().AddCharacter(character.data.id, SceneNav.GetCurrentScene(), transform.position, transform.rotation);
+                    unique_id.SetUID(cdata.uid);
+                    PlayerData.Get().RemoveObject(prev_uid);
+                }
+
+                //Set master
+                master_player = player.player_id;
+                player.Data.AddPet(unique_id.unique_id, character.data.id);
+                PlayerData.Get().SetCustomInt(unique_id.GetSubUID("master"), player.player_id);
+            }
+        }
+
+        public void UntamePet()
+        {
+            if (HasMaster() && unique_id.HasUID())
+            {
+                StopAction();
+
+                //Remove master
+                PlayerCharacter master = GetMaster();
+                master.Data.RemovePet(unique_id.unique_id);
+                master_player = -1;
+                PlayerData.Get().SetCustomInt(unique_id.GetSubUID("master"), -1);
+            }
+        }
+
+        public void Follow()
+        {
+            if (HasMaster())
+            {
+                StopAction();
+                follow = true;
+                ChangeState(PetState.Follow);
+            }
+        }
+
+        public void StopFollow()
+        {
+            StopAction();
+            follow = false;
+            ChangeState(PetState.Idle);
         }
 
         public void AttackTarget(Destructible target)
@@ -273,7 +336,17 @@ namespace SurvivalEngine
             attack_target = null;
             action_target = null;
             force_action = false;
+            follow = false;
             ChangeState(PetState.Idle);
+        }
+
+        private void FindWanderTarget()
+        {
+            float range = Random.Range(0f, follow_range);
+            float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
+            Vector3 spos = start_pos;
+            Vector3 pos = spos + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * range;
+            wander_target = pos;
         }
 
         public void ChangeState(PetState state)
@@ -311,19 +384,31 @@ namespace SurvivalEngine
                 onDeath.Invoke();
         }
 
-        public bool HasFollowTarget()
-        {
-            return player_target != null;
-        }
 
         public bool PlayerIsFar(float distance)
         {
-            if (HasFollowTarget())
+            if (HasMaster())
             {
-                Vector3 dir = player_target.transform.position - transform.position;
+                PlayerCharacter master = GetMaster();
+                Vector3 dir = master.transform.position - transform.position;
                 return dir.magnitude > distance;
             }
             return false;
+        }
+
+        public PlayerCharacter GetMaster()
+        {
+            return PlayerCharacter.Get(master_player);
+        }
+
+        public bool HasMaster()
+        {
+            return master_player >= 0;
+        }
+
+        public bool IsFollow()
+        {
+            return follow;
         }
 
         public bool IsDead()

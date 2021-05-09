@@ -322,7 +322,7 @@ namespace SurvivalEngine
                             //Find character to escape from
                             if (HasEscapeBehavior())
                             {
-                                Character character = selectable.GetComponent<Character>();
+                                Character character = selectable.GetCharacter();
                                 if (character && character.attack_enabled) //Only afraid if the character can attack
                                 {
                                     if (character.GetDestructible().team_group != this.destruct.team_group) //Not afraid if in same team

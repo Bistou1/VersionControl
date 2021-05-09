@@ -86,9 +86,9 @@ namespace SurvivalEngine
                 return;
             }
 
-            if (HasUID() && PlayerData.Get().HasCustomValue(GetHpUID()))
+            if (HasUID() && PlayerData.Get().HasCustomInt(GetHpUID()))
             {
-                hp = PlayerData.Get().GetCustomValue(GetHpUID());
+                hp = PlayerData.Get().GetCustomInt(GetHpUID());
             }
         }
 
@@ -183,7 +183,7 @@ namespace SurvivalEngine
                 int adamage = Mathf.Max(damage - armor, 1);
                 hp -= adamage;
 
-                PlayerData.Get().SetCustomValue(GetHpUID(), hp);
+                PlayerData.Get().SetCustomInt(GetHpUID(), hp);
 
                 if (shake_on_hit)
                     ShakeFX();
@@ -207,7 +207,7 @@ namespace SurvivalEngine
                 hp += value;
                 hp = Mathf.Min(hp, max_hp);
 
-                PlayerData.Get().SetCustomValue(GetHpUID(), hp);
+                PlayerData.Get().SetCustomInt(GetHpUID(), hp);
             }
         }
 
@@ -234,8 +234,9 @@ namespace SurvivalEngine
                 foreach (Collider collide in colliders)
                     collide.enabled = false;
 
-                PlayerData.Get().RemoveObject(GetUID());
-                PlayerData.Get().RemoveCustomValue(GetHpUID());
+                PlayerData.Get().RemoveObject(GetUID()); //Remove object if it was in initial scene
+                PlayerData.Get().RemoveSpawnedObject(GetUID()); //Remove object if it was spawned
+                PlayerData.Get().RemoveCustomInt(GetHpUID()); //Remove HP custom value
 
                 if (onDeath != null)
                     onDeath.Invoke();
@@ -307,6 +308,11 @@ namespace SurvivalEngine
             {
                 PlantData plant_data = (PlantData)item;
                 Plant.Create(plant_data, pos, 0);
+            }
+            if (item is SpawnData)
+            {
+                SpawnData spawn_data = (SpawnData)item;
+                Spawnable.Create(spawn_data, pos);
             }
             if (item is LootData)
             {

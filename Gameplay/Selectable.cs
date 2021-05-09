@@ -7,7 +7,8 @@ namespace SurvivalEngine
 {
     public enum SelectableType
     {
-        Interact=0,
+        Interact=0, //Interacts at the pivot position of the object (transform position)
+        InteractBound=5, //When its set to Bound, will interest with the nearest position in the collider's bounding box
         InteractSurface=10, //When it's a surface, can be interacted with at different position among the surface, instead of just the center
         CantInteract =20, //Can be clicked on/hovered, but cant interact
         CantSelect=30, //Cannot be clicked on or hovered
@@ -25,9 +26,6 @@ namespace SurvivalEngine
     {
         public SelectableType type; 
         public float use_range = 2f;
-
-        [HideInInspector]
-        public bool surface; //Obsolete, part of the "type" now, will be removed in future versions
 
         [Header("Action")]
         public SAction[] actions;
@@ -52,7 +50,8 @@ namespace SurvivalEngine
         public UnityAction onDestroy;
 
         private Collider[] colliders;
-        private Destructible destruct; //May be null, not all selectables have one, so check if null first
+        private Destructible destruct; //May be null, not all selectables have one, so check if null first (quick access for optimization)
+        private Character character; //May be null, not all selectables have one, so check if null first (quick access for optimization)
         private UniqueID unique_id; //May be null,  not all selectables have one, so check if null first
         private Transform transf; //Quick access to last position
         private bool is_hovered = false;
@@ -69,6 +68,7 @@ namespace SurvivalEngine
         void Awake()
         {
             destruct = GetComponent<Destructible>();
+            character = GetComponent<Character>();
             unique_id = GetComponent<UniqueID>();
             colliders = GetComponentsInChildren<Collider>();
             selectable_list.Add(this);
@@ -319,20 +319,31 @@ namespace SurvivalEngine
 
         public bool IsNearCamera(float distance)
         {
-            float dist = (transform.position - TheCamera.Get().GetTargetPos()).magnitude;
+            float dist = (transf.position - TheCamera.Get().GetTargetPos()).magnitude;
             return dist < distance;
         }
 
         public Vector3 GetClosestInteractPoint(Vector3 pos)
         {
-            return surface ? GetClosestPoint(pos) : transform.position; //If not surface, always interact from center
+            if (type == SelectableType.InteractBound || type == SelectableType.InteractSurface)
+                return GetClosestPoint(pos);
+            return transf.position; //If not surface, always interact from center
+        }
+
+        public Vector3 GetClosestInteractPoint(Vector3 pos, Vector3 click_pos)
+        {
+            if (type == SelectableType.InteractBound)
+                return GetClosestPoint(pos);
+            if (type == SelectableType.InteractSurface)
+                return click_pos; //If surface, interact where you clicked
+            return transf.position; //If not surface, always interact from center
         }
 
         public Vector3 GetClosestPoint(Vector3 pos) 
         {
             //A bit slow dont run every frame
-            Vector3 nearest = transform.position;
-            float min_dist = (transform.position - pos).magnitude;
+            Vector3 nearest = transf.position;
+            float min_dist = (transf.position - pos).magnitude;
             foreach (Collider collide in colliders)
             {
                 Vector3 npos = collide.bounds.ClosestPoint(pos);
@@ -351,6 +362,11 @@ namespace SurvivalEngine
             return destruct; //May be null, beware!
         }
 
+        public Character GetCharacter()
+        {
+            return character; //May be null, beware!
+        }
+
         public string GetUID()
         {
             if (unique_id != null)
@@ -367,7 +383,7 @@ namespace SurvivalEngine
             {
                 if (select.enabled && select.gameObject.activeSelf)
                 {
-                    float dist = (select.transform.position - pos).magnitude;
+                    float dist = (select.transf.position - pos).magnitude;
                     if (dist < min_dist)
                     {
                         min_dist = dist;
@@ -387,7 +403,7 @@ namespace SurvivalEngine
             {
                 if (select.enabled && select.gameObject.activeSelf && select.IsHovered())
                 {
-                    float dist = (select.transform.position - pos).magnitude;
+                    float dist = (select.transf.position - pos).magnitude;
                     if (dist < min_dist)
                     {
                         min_dist = dist;
@@ -407,7 +423,7 @@ namespace SurvivalEngine
             {
                 if (select.enabled && select.gameObject.activeSelf && select.CanAutoInteract())
                 {
-                    float offset = select.surface ? 2f : 0f; //Prioritize not surface by 2f
+                    float offset = select.type == SelectableType.InteractSurface ? 2f : 0f; //Prioritize not surface by 2f
                     float dist = (select.GetClosestInteractPoint(pos) - pos).magnitude + offset;
                     if (dist < min_dist)
                     {
@@ -428,7 +444,7 @@ namespace SurvivalEngine
             {
                 if (select.enabled && select.gameObject.activeSelf && select.HasGroup(group))
                 {
-                    float offset = select.surface ? 1f : 0f; //Prioritize not surface by 1f
+                    float offset = select.type == SelectableType.InteractSurface ? 1f : 0f; //Prioritize not surface by 1f
                     float dist = (select.GetClosestInteractPoint(pos) - pos).magnitude + offset;
                     if (dist < min_dist)
                     {
@@ -449,7 +465,7 @@ namespace SurvivalEngine
             {
                 if (select.enabled && select.gameObject.activeSelf && select.HasGroup(groups))
                 {
-                    float offset = select.surface ? 1f : 0f; //Prioritize not surface by 1f
+                    float offset = select.type == SelectableType.InteractSurface ? 1f : 0f; //Prioritize not surface by 1f
                     float dist = (select.GetClosestInteractPoint(pos) - pos).magnitude + offset;
                     if (dist < min_dist)
                     {
