@@ -24,7 +24,8 @@ namespace SurvivalEngine
         public float zoom_speed = 0.5f;
         public float zoom_in_max = 0.5f;
         public float zoom_out_max = 1f;
-        public bool inverted_rotate = false;
+        public bool inverted_rotate = false; //Rotating the camera controls will be reversed
+        public bool smooth_camera = true; //Camera will be more smooth but less accurate
 
         [Header("Mobile Only")]
         public float rotate_speed_touch = 10f; //Mobile touch
@@ -138,8 +139,17 @@ namespace SurvivalEngine
             Vector3 target_pos = follow_target.transform.position + current_offset;
             target_transform.position = target_pos;
 
-            transform.rotation = Quaternion.Slerp(transform.rotation, target_transform.rotation, move_speed * Time.deltaTime);
-            transform.position = Vector3.SmoothDamp(transform.position, target_transform.position, ref current_vel, 1f / move_speed);
+            //Move to target position
+            if (smooth_camera)
+            {
+                transform.rotation = Quaternion.Slerp(transform.rotation, target_transform.rotation, move_speed * Time.deltaTime);
+                transform.position = Vector3.SmoothDamp(transform.position, target_transform.position, ref current_vel, 1f / move_speed);
+            }
+            else
+            {
+                transform.rotation = target_transform.rotation;
+                transform.position = target_transform.position;
+            }
         }
 
         private void UpdateFreeCamera()
@@ -172,9 +182,17 @@ namespace SurvivalEngine
             Vector3 target_pos = follow_target.transform.position + current_offset;
             target_transform.position = target_pos;
 
-            //Set to target
-            transform.rotation = target_transform.rotation;
-            transform.position = target_transform.position;
+            //Move to target position
+            if (smooth_camera)
+            {
+                transform.rotation = Quaternion.Slerp(transform.rotation, target_transform.rotation, move_speed * Time.deltaTime);
+                transform.position = Vector3.SmoothDamp(transform.position, target_transform.position, ref current_vel, 1f / move_speed);
+            }
+            else
+            {
+                transform.rotation = target_transform.rotation;
+                transform.position = target_transform.position;
+            }
         }
 
         public void SetLockMode(bool locked)

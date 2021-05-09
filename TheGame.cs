@@ -41,43 +41,29 @@ namespace SurvivalEngine
         {
             PlayerData pdata = PlayerData.Get();
             GameObject spawn_parent = new GameObject("SaveFileSpawns");
+            string scene = SceneNav.GetCurrentScene();
 
-            //Spawn dropped items
-            foreach (KeyValuePair<string, DroppedItemData> elem in pdata.dropped_items)
-            {
-                Item.Spawn(elem.Key, spawn_parent.transform);
-            }
-
-            //Spawn constructions
+            //Spawn constructions (do this first because they may be big, have colliders, entry zones that affect the player)
             foreach (KeyValuePair<string, BuiltConstructionData> elem in pdata.built_constructions)
             {
                 Construction.Spawn(elem.Key, spawn_parent.transform);
             }
 
-            //Spawn plants
-            foreach (KeyValuePair<string, SowedPlantData> elem in pdata.sowed_plants)
-            {
-                Plant.Spawn(elem.Key, spawn_parent.transform);
-            }
-
-            //Spawn characters
-            foreach (KeyValuePair<string, TrainedCharacterData> elem in pdata.trained_characters)
-            {
-                Character.Spawn(elem.Key, spawn_parent.transform);
-            }
-
             //Set player and camera position
-            if (!string.IsNullOrEmpty(pdata.current_scene) && pdata.current_scene == SceneNav.GetCurrentScene())
+            if (!string.IsNullOrEmpty(pdata.current_scene) && pdata.current_scene == scene)
             {
                 foreach (PlayerCharacter player in PlayerCharacter.GetAll())
                 {
                     //Entry index: -1 = go to saved pos, 0=dont change character pos, 1+ = go to entry index
+
+                    //Saved position
                     if (pdata.current_entry_index < 0)
                     {
                         player.transform.position = player.Data.position;
                         TheCamera.Get().MoveToTarget(player.Data.position);
                     }
 
+                    //Entry index
                     if (pdata.current_entry_index > 0)
                     {
                         ExitZone zone = ExitZone.GetIndex(pdata.current_entry_index);
@@ -94,11 +80,50 @@ namespace SurvivalEngine
                             TheCamera.Get().MoveToTarget(pos);
                         }
                     }
+
+                    //Update saved pos
+                    player.Data.position = player.transform.position;
                 }
             }
 
+            //Update pet position (do this before spawning characters)
+            foreach (PlayerCharacter player in PlayerCharacter.GetAll())
+            {
+                foreach (KeyValuePair<string, PlayerPetData> pet_pair in player.Data.pets)
+                {
+                    float radius = 1f;
+                    float angle = Random.Range(0f, 360f);
+                    Vector3 pos = player.transform.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
+                    PlayerData.Get().SetCharacterPosition(pet_pair.Key, scene, pos, player.transform.rotation);
+                }
+            }
+
+            //Spawn characters
+            foreach (KeyValuePair<string, TrainedCharacterData> elem in pdata.trained_characters)
+            {
+                Character.Spawn(elem.Key, spawn_parent.transform);
+            }
+
+            //Spawn plants
+            foreach (KeyValuePair<string, SowedPlantData> elem in pdata.sowed_plants)
+            {
+                Plant.Spawn(elem.Key, spawn_parent.transform);
+            }
+
+            //Spawn others
+            foreach (KeyValuePair<string, SpawnedData> elem in pdata.spawned_objects)
+            {
+                Spawnable.Spawn(elem.Key, spawn_parent.transform);
+            }
+
+            //Spawn dropped items
+            foreach (KeyValuePair<string, DroppedItemData> elem in pdata.dropped_items)
+            {
+                Item.Spawn(elem.Key, spawn_parent.transform);
+            }
+
             //Set current scene
-            pdata.current_scene = SceneNav.GetCurrentScene();
+            pdata.current_scene = scene;
 
             //Black panel transition
             if (!BlackPanel.Get().IsVisible())
@@ -259,6 +284,13 @@ namespace SurvivalEngine
         {
             PlayerData pdata = PlayerData.Get();
             return pdata.day_time >= 18f || pdata.day_time < 6f;
+        }
+
+        public bool IsWeather(WeatherEffect effect)
+        {
+            if (WeatherSystem.Get() != null)
+                return WeatherSystem.Get().HasWeatherEffect(effect);
+            return false;
         }
 
         //Set to 1f for default speed

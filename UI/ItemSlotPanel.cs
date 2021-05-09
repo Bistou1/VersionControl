@@ -49,6 +49,10 @@ namespace SurvivalEngine
 
             onClickSlot += OnClick;
             onRightClickSlot += OnClickRight;
+            onDoubleClickSlot += OnClickRight;
+            onLongClickSlot += OnClickRight;
+            onDragStart += OnDragStart;
+            onDragTo += OnDragTo;
             onPressAccept += OnClick;
             onPressUse += OnClickRight;
             onPressCancel += OnCancel;
@@ -145,10 +149,10 @@ namespace SurvivalEngine
                 }
 
                 //Merge two slots
-                ItemSlot islot = (ItemSlot)uislot;
+                ItemSlot islot = uislot as ItemSlot;
                 if (islot != null && selslot != null)
                 {
-                    MergeSlots(selslot, (ItemSlot)uislot);
+                    MergeSlots(selslot, islot);
                     if (onMergeSlot != null)
                         onMergeSlot.Invoke(selslot, islot);
                 }
@@ -176,7 +180,7 @@ namespace SurvivalEngine
             ActionSelectorUI.Get(GetPlayerID()).Hide();
 
             //Run auto actions
-            ItemSlot islot = (ItemSlot)uislot;
+            ItemSlot islot = uislot as ItemSlot;
             ItemData idata = islot?.GetItem();
             AAction aaction = idata?.FindAutoAction(GetPlayer(), islot);
             aaction?.DoAction(GetPlayer(), islot);
@@ -186,6 +190,23 @@ namespace SurvivalEngine
             {
                 selected_right_slot = islot.index;
                 ActionSelectorUI.Get(GetPlayerID()).Show(islot);
+            }
+        }
+
+        private void OnDragStart(UISlot slot)
+        {
+            CancelSelection();
+        }
+
+        private void OnDragTo(UISlot slot, UISlot target)
+        {
+            if (slot != null && target != null)
+            {
+                ItemSlot islot = slot as ItemSlot;
+                ItemSlot itarget = target as ItemSlot;
+                MergeSlots(islot, itarget);
+                if (onMergeSlot != null)
+                    onMergeSlot.Invoke(islot, itarget);
             }
         }
 
@@ -450,6 +471,17 @@ namespace SurvivalEngine
             foreach (ItemSlotPanel panel in slot_panels)
             {
                 ItemSlot slot = panel.GetSelectedSlot();
+                if (slot != null)
+                    return slot;
+            }
+            return null;
+        }
+
+        public static ItemSlot GetDragSlotInAllPanels()
+        {
+            foreach (ItemSlotPanel panel in slot_panels)
+            {
+                ItemSlot slot = panel.GetDragSlot();
                 if (slot != null)
                     return slot;
             }

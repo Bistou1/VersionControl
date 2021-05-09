@@ -18,6 +18,13 @@ namespace SurvivalEngine
 
         public UnityAction<UISlot> onClickSlot;
         public UnityAction<UISlot> onRightClickSlot;
+        public UnityAction<UISlot> onLongClickSlot;
+        public UnityAction<UISlot> onDoubleClickSlot;
+
+        public UnityAction<UISlot> onDragStart; //When you started dragging and exit the first slot
+        public UnityAction<UISlot> onDragEnd; //When dragging and releasing
+        public UnityAction<UISlot, UISlot> onDragTo; //When dragging slot and releasing on another slot
+
         public UnityAction<UISlot> onPressAccept;
         public UnityAction<UISlot> onPressCancel;
         public UnityAction<UISlot> onPressUse;
@@ -46,8 +53,13 @@ namespace SurvivalEngine
                 slots[i].index = index;
                 slots[i].onClick += OnClickSlot;
                 slots[i].onClickRight += OnClickSlotRight;
-                slots[i].onClickLong += OnClickSlotRight;
-                slots[i].onClickDouble += OnClickSlotRight;
+                slots[i].onClickLong += OnClickSlotLong;
+                slots[i].onClickDouble += OnClickSlotDouble;
+
+                slots[i].onDragStart += OnDragStart;
+                slots[i].onDragEnd += OnDragEnd;
+                slots[i].onDragTo += OnDragTo;
+
                 slots[i].onPressAccept += OnPressAccept;
                 slots[i].onPressCancel += OnPressCancel;
                 slots[i].onPressUse += OnPressUse;
@@ -125,9 +137,38 @@ namespace SurvivalEngine
 
         private void OnClickSlotRight(UISlot islot)
         {
-            //Event
             if (onRightClickSlot != null)
                 onRightClickSlot.Invoke(islot);
+        }
+
+        private void OnClickSlotLong(UISlot islot)
+        {
+            if (onLongClickSlot != null)
+                onLongClickSlot.Invoke(islot);
+        }
+
+        private void OnClickSlotDouble(UISlot islot)
+        {
+            if (onDoubleClickSlot != null)
+                onDoubleClickSlot.Invoke(islot);
+        }
+
+        private void OnDragStart(UISlot islot)
+        {
+            if (onDragStart != null)
+                onDragStart.Invoke(islot);
+        }
+
+        private void OnDragEnd(UISlot islot)
+        {
+            if (onDragEnd != null)
+                onDragEnd.Invoke(islot);
+        }
+
+        private void OnDragTo(UISlot islot, UISlot target)
+        {
+            if (onDragTo != null)
+                onDragTo.Invoke(islot, target);
         }
 
         public int CountActiveSlots()
@@ -154,6 +195,16 @@ namespace SurvivalEngine
         public UISlot GetSelectSlot()
         {
             return GetSlot(selection_index);
+        }
+
+        public ItemSlot GetDragSlot()
+        {
+            foreach (ItemSlot slot in slots)
+            {
+                if (slot.IsDrag())
+                    return slot;
+            }
+            return null;
         }
 
         public bool IsSelectedInvisible()

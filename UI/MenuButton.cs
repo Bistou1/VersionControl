@@ -47,8 +47,9 @@ namespace SurvivalEngine {
             }
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             button_list.Remove(this);
         }
 

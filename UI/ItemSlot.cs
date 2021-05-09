@@ -219,13 +219,13 @@ namespace SurvivalEngine
 
         public string GetInventoryUID()
         {
-            ItemSlotPanel parent_item = (ItemSlotPanel)parent;
+            ItemSlotPanel parent_item = parent as ItemSlotPanel;
             return parent_item?.GetInventoryUID();
         }
 
         public InventoryData GetInventory()
         {
-            ItemSlotPanel parent_item = (ItemSlotPanel)parent;
+            ItemSlotPanel parent_item = parent as ItemSlotPanel;
             return parent_item?.GetInventory();
         }
 

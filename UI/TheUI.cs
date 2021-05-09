@@ -60,6 +60,11 @@ namespace SurvivalEngine
                 Instantiate(AssetData.Get().item_select_fx, transform.position, Quaternion.identity);
             }
 
+            if (ItemDragFX.Get() == null && AssetData.Get().item_drag_fx != null)
+            {
+                Instantiate(AssetData.Get().item_drag_fx, transform.position, Quaternion.identity);
+            }
+
             PlayerUI gameplay_ui = GetComponentInChildren<PlayerUI>();
             if (gameplay_ui == null)
                 Debug.LogError("Warning: Missing PlayerUI script on the Gameplay tab in the UI prefab");
@@ -122,6 +127,19 @@ namespace SurvivalEngine
             Vector2 localpoint;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(rect, pos, canvas.worldCamera, out localpoint);
             return localpoint;
+        }
+
+        public Vector2 ScreenPointToCanvasPos(Vector2 pos, RectTransform localRect)
+        {
+            Vector2 localpoint;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(localRect, pos, canvas.worldCamera, out localpoint);
+            return localpoint;
+        }
+
+        public Vector2 WorldToCanvasPos(Vector3 world)
+        {
+            Vector2 screen_pos = TheCamera.GetCamera().WorldToScreenPoint(world);
+            return ScreenPointToCanvasPos(screen_pos);
         }
 
         //Menu are panels that block gamepad controls

@@ -26,6 +26,11 @@ namespace SurvivalEngine
         public UnityAction<UISlot> onClickRight;
         public UnityAction<UISlot> onClickLong;
         public UnityAction<UISlot> onClickDouble;
+
+        public UnityAction<UISlot> onDragStart; //When you started dragging and exit the first slot
+        public UnityAction<UISlot> onDragEnd; //When dragging and releasing
+        public UnityAction<UISlot, UISlot> onDragTo; //When dragging slot and releasing on another slot
+
         public UnityAction<UISlot> onPressKey; //Numerical key
         public UnityAction<UISlot> onPressAccept;
         public UnityAction<UISlot> onPressCancel;
@@ -40,16 +45,26 @@ namespace SurvivalEngine
         protected bool key_hover = false;
 
         private bool is_holding = false;
+        private bool can_drag = false;
+        private bool is_dragging = false;
         private bool can_click = false;
         private float holding_timer = 0f;
         private float double_timer = 0f;
 
+        private static List<UISlot> slot_list = new List<UISlot>();
+
         protected virtual void Awake()
         {
+            slot_list.Add(this);
             parent = GetComponentInParent<UISlotPanel>();
             rect = GetComponent<RectTransform>();
             evt_trigger = GetComponent<EventTrigger>();
             button = GetComponent<Button>();
+        }
+
+        protected virtual void OnDestroy()
+        {
+            slot_list.Remove(this);
         }
 
         protected virtual void Start()
@@ -131,6 +146,11 @@ namespace SurvivalEngine
             selected = false;
         }
 
+        public void SetSelected(bool sel)
+        {
+            selected = sel;
+        }
+
         public bool IsSelected()
         {
             return selected;
@@ -182,6 +202,8 @@ namespace SurvivalEngine
         void OnDown(BaseEventData eventData)
         {
             is_holding = true;
+            can_drag = true;
+            is_dragging = false;
             can_click = true;
             holding_timer = 0f;
 
@@ -212,16 +234,40 @@ namespace SurvivalEngine
         void OnUp(BaseEventData eventData)
         {
             is_holding = false;
+            can_drag = false;
+
+            //Drag n drop
+            if (is_dragging)
+            {
+                is_dragging = false;
+                onDragEnd?.Invoke(this);
+                Vector3 anchor_pos = TheUI.Get().ScreenPointToCanvasPos(Input.mousePosition);
+                UISlot target = UISlot.GetNearestActive(anchor_pos, 50f);
+                if (target != null && target != this)
+                    onDragTo?.Invoke(this, target);
+            }
         }
 
         void OnExit(BaseEventData eventData)
         {
             is_holding = false;
+
+            if (can_drag)
+            {
+                can_drag = false;
+                is_dragging = true;
+                onDragStart?.Invoke(this);
+            }
         }
 
         public bool IsVisible()
         {
             return gameObject.activeSelf && (parent == null || parent.IsVisible());
+        }
+
+        public bool IsDrag()
+        {
+            return is_dragging;
         }
 
         public RectTransform GetRect()
@@ -232,6 +278,33 @@ namespace SurvivalEngine
         public UISlotPanel GetParent()
         {
             return parent;
+        }
+
+        public static UISlot GetDrag()
+        {
+            foreach (UISlot slot in slot_list)
+            {
+                if (slot.IsDrag())
+                    return slot;
+            }
+            return null;
+        }
+
+        public static UISlot GetNearestActive(Vector2 anchor_pos, float range=999f)
+        {
+            UISlot nearest = null;
+            float min_dist = range;
+            foreach (UISlot slot in slot_list)
+            {
+                Vector2 canvas_pos = TheUI.Get().WorldToCanvasPos(slot.transform.position);
+                float dist = (canvas_pos - anchor_pos).magnitude;
+                if (dist < min_dist && slot.gameObject.activeInHierarchy)
+                {
+                    min_dist = dist;
+                    nearest = slot;
+                }
+            }
+            return nearest;
         }
     }
 

@@ -42,13 +42,14 @@ namespace SurvivalEngine
             //Day night
             GameData gdata = GameData.Get();
             bool is_night = TheGame.Get().IsNight();
+            float light_mult = GetLightMult();
             float target = is_night ? gdata.night_light_ambient_intensity : gdata.day_light_ambient_intensity;
             float light_angle = PlayerData.Get().day_time * 360f / 24f;
-            RenderSettings.ambientIntensity = Mathf.MoveTowards(RenderSettings.ambientIntensity, target, 0.2f * Time.deltaTime);
+            RenderSettings.ambientIntensity = Mathf.MoveTowards(RenderSettings.ambientIntensity, target * light_mult, 0.2f * Time.deltaTime);
             if (dir_light != null && dir_light.type == LightType.Directional)
             {
                 float dtarget = is_night ? gdata.night_light_dir_intensity : gdata.day_light_dir_intensity;
-                dir_light.intensity = Mathf.MoveTowards(dir_light.intensity, dtarget, 0.2f * Time.deltaTime);
+                dir_light.intensity = Mathf.MoveTowards(dir_light.intensity, dtarget * light_mult, 0.2f * Time.deltaTime);
                 dir_light.shadowStrength = Mathf.MoveTowards(dir_light.shadowStrength, is_night ? 0f : 1f, 0.2f * Time.deltaTime);
                 if (gdata.rotate_shadows)
                     dir_light.transform.rotation = Quaternion.Euler(0f, light_angle + 180f, 0f) * start_rot;
@@ -82,6 +83,13 @@ namespace SurvivalEngine
                     return light;
             }
             return null;
+        }
+
+        public float GetLightMult()
+        {
+            if (WeatherSystem.Get())
+                return WeatherSystem.Get().GetLightMult();
+            return 1f;
         }
     }
 
