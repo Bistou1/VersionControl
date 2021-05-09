@@ -237,19 +237,19 @@ namespace SurvivalEngine
             }
 
             //World regrowth
-            List<WorldRegrowthData> spawn_growth_list = new List<WorldRegrowthData>();
-            foreach (KeyValuePair<string, WorldRegrowthData> pair in PlayerData.Get().world_regrowth)
+            List<RegrowthData> spawn_growth_list = new List<RegrowthData>();
+            foreach (KeyValuePair<string, RegrowthData> pair in PlayerData.Get().world_regrowth)
             {
-                WorldRegrowthData bdata = pair.Value;
+                RegrowthData bdata = pair.Value;
                 bdata.time -= game_speed * Time.deltaTime;
 
                 if (bdata.time <= 0f && bdata.scene == SceneNav.GetCurrentScene())
                     spawn_growth_list.Add(pair.Value);
             }
 
-            foreach (WorldRegrowthData regrowth in spawn_growth_list)
+            foreach (RegrowthData regrowth in spawn_growth_list)
             {
-                WorldRegrowth.SpawnRegrowth(regrowth);
+                Regrowth.SpawnRegrowth(regrowth);
                 PlayerData.Get().RemoveWorldRegrowth(regrowth.uid);
             }
             spawn_growth_list.Clear();

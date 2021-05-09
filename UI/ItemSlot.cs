@@ -229,10 +229,11 @@ namespace SurvivalEngine
             return parent_item?.GetInventory();
         }
 
-        public ConstructionData GetConstruction()
+        public InventoryItemData GetInventoryItem()
         {
-            if (item != null)
-                return item.GetConstruction();
+            InventoryData inventory = GetInventory();
+            if (inventory != null)
+                return inventory.GetItem(index);
             return null;
         }
 

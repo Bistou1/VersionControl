@@ -21,7 +21,8 @@ namespace SurvivalEngine
             //Light
             GameData gdata = GameData.Get();
             bool is_night = TheGame.Get().IsNight();
-            dir_light = FindObjectOfType<Light>();
+            dir_light = GetDirectionalLight();
+
             float target = is_night ? gdata.night_light_ambient_intensity : gdata.day_light_ambient_intensity;
             float light_angle = PlayerData.Get().day_time * 360f / 24f;
             RenderSettings.ambientIntensity = target;
@@ -71,6 +72,16 @@ namespace SurvivalEngine
                 float dist = (select.GetPosition() - center_pos).magnitude;
                 select.SetActive(dist < select.active_range * GameData.Get().optim_distance_multiplier, GameData.Get().optim_turn_off_gameobjects);
             }
+        }
+
+        public Light GetDirectionalLight()
+        {
+            foreach (Light light in FindObjectsOfType<Light>())
+            {
+                if (light.type == LightType.Directional)
+                    return light;
+            }
+            return null;
         }
     }
 

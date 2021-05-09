@@ -42,23 +42,6 @@ namespace SurvivalEngine
             base.Start();
         }
 
-        protected override void RefreshPanel()
-        {
-            base.RefreshPanel();
-
-            //Automatic actions
-            PlayerCharacter player = GetPlayer();
-            if (player != null)
-            {
-                foreach (UISlot slot in slots)
-                {
-                    ItemSlot islot = (ItemSlot)slot;
-                    ItemData idata = islot?.GetItem();
-                    idata?.RunAutoActions(player, islot);
-                }
-            }
-        }
-
         public override void InitPanel()
         {
             base.InitPanel();

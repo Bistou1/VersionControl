@@ -159,7 +159,8 @@ namespace SurvivalEngine
                     selected_slot = slot;
 
                     ItemData idata = islot?.GetItem();
-                    idata?.RunAutoActions(GetPlayer(), islot);
+                    AAction aaction = idata?.FindAutoAction(GetPlayer(), islot);
+                    aaction?.DoSelectAction(GetPlayer(), islot);
 
                     if (onSelectSlot != null)
                         onSelectSlot.Invoke(islot);
@@ -174,10 +175,14 @@ namespace SurvivalEngine
             selected_right_slot = -1;
             ActionSelectorUI.Get(GetPlayerID()).Hide();
 
-            //Show action selector
+            //Run auto actions
             ItemSlot islot = (ItemSlot)uislot;
-            CraftData item = islot.GetCraftable();
-            if (item != null && item.GetItem() != null && item.GetItem().actions.Length > 0)
+            ItemData idata = islot?.GetItem();
+            AAction aaction = idata?.FindAutoAction(GetPlayer(), islot);
+            aaction?.DoAction(GetPlayer(), islot);
+
+            //Show action selector
+            if (idata != null && islot?.GetInventoryItem() != null && idata.actions.Length > 0)
             {
                 selected_right_slot = islot.index;
                 ActionSelectorUI.Get(GetPlayerID()).Show(islot);

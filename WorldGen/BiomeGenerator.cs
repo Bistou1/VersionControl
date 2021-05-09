@@ -18,6 +18,7 @@ namespace SurvivalEngine.WorldGen
         public Collider zone;
         public int seed;
         public int iterations = 1000;
+        public LayerMask floor_layer = (1 << 9);
 
         private int original_seed = 0;
         private int world_seed = 0;
@@ -124,9 +125,10 @@ namespace SurvivalEngine.WorldGen
                 if (spawned_items_group.Count > spawn_max)
                     return;
 
-                Vector3 pos = new Vector3(Random.Range(min.x, max.x), this.data.elevation, Random.Range(min.z, max.z));
+                Vector3 pos = new Vector3(Random.Range(min.x, max.x), zone.bounds.center.y, Random.Range(min.z, max.z));
+                bool found = PhysicsTool.FindGroundPosition(pos, zone.bounds.extents.y, floor_layer, out pos);
 
-                if (IsInsideZone(pos))
+                if (found && IsInsideZone(pos))
                 {
                     GameObject prefab = data.PickRandomPrefab();
                     if (prefab != null)

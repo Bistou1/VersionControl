@@ -23,23 +23,6 @@ namespace SurvivalEngine
             onMergeSlot += OnMergeSlot;
         }
 
-        protected override void RefreshPanel()
-        {
-            base.RefreshPanel();
-
-            //Automatic actions
-            PlayerCharacter player = GetPlayer();
-            if (player != null)
-            {
-                foreach (UISlot slot in slots)
-                {
-                    ItemSlot islot = (ItemSlot)slot;
-                    ItemData idata = islot?.GetItem();
-                    idata?.RunAutoActions(player, islot);
-                }
-            }
-        }
-
         public void ShowBag(PlayerCharacter player, string uid, int max)
         {
             if (!string.IsNullOrEmpty(uid))
