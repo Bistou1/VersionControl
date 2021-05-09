@@ -90,10 +90,6 @@ namespace SurvivalEngine
             selectable = GetComponent<Selectable>();
             animator = GetComponentInChildren<Animator>();
             start_pos = transform.position;
-
-            character.onAttack += OnAttack;
-            destruct.onDamaged += OnTakeDamage;
-            destruct.onDeath += OnKill;
             state_timer = 99f; //Find wander right away
             update_timer = Random.Range(-1f, 1f);
 
@@ -103,9 +99,11 @@ namespace SurvivalEngine
 
         void Start()
         {
-            onAttack += OnAttack;
-            onDamaged += OnDamaged;
-            onDeath += OnDeath;
+            character.onAttack += OnAttack;
+            destruct.onDamaged += OnDamaged;
+            destruct.onDamagedByCharacter += OnDamagedCharacter;
+            destruct.onDamagedByPlayer += OnDamagedPlayer;
+            destruct.onDeath += OnDeath;
         }
 
         void FixedUpdate()
@@ -115,10 +113,8 @@ namespace SurvivalEngine
 
             //Optimization, dont run if too far
             float dist = (TheCamera.Get().GetTargetPos() - transform.position).magnitude;
-            is_active = (state != AnimalState.Wander && state != AnimalState.Dead) || dist < Mathf.Max(detect_range * 2f, 20f);
-
-            if (!is_active && character.IsMoving())
-                character.Stop();
+            float active_range = Mathf.Max(detect_range * 2f, selectable.active_range * 0.8f);
+            is_active = (state != AnimalState.Wander && state != AnimalState.Dead) || character.IsMoving() || dist < active_range;
         }
 
         private void Update()
@@ -126,7 +122,7 @@ namespace SurvivalEngine
             //Animations
             bool paused = TheGame.Get().IsPaused();
             if (animator != null)
-                animator.enabled = !paused && selectable.AreScriptsActive();
+                animator.enabled = !paused;
 
             if (TheGame.Get().IsPaused())
                 return;
@@ -194,7 +190,7 @@ namespace SurvivalEngine
                     Vector3 targ_dir = (target.transform.position - transform.position);
                     targ_dir.y = 0f;
 
-                    if (targ_dir.magnitude > detect_range && state_timer > action_duration)
+                    if (targ_dir.magnitude > detect_range)
                     {
                         StopAction();
                     }
@@ -261,10 +257,19 @@ namespace SurvivalEngine
                     }
                 }
             }
+
+            if (state == AnimalState.Attack)
+            {
+                if (character.IsStuck() && !character.IsAttacking() && state_timer > 1f)
+                {
+                    DetectThreat(detect_range);
+                    ReactToThreat();
+                }
+            }
         }
 
         //Detect if the player is in vision
-        private void DetectThreat(float range, bool anyside = false)
+        private void DetectThreat(float range)
         {
             Vector3 pos = transform.position;
 
@@ -278,7 +283,7 @@ namespace SurvivalEngine
                 {
                     float dangle = detect_angle / 2f; // /2 for each side
                     float angle = Vector3.Angle(transform.forward, char_dir.normalized);
-                    if (anyside || angle < dangle || char_dir.magnitude < detect_360_range)
+                    if (angle < dangle || char_dir.magnitude < detect_360_range)
                     {
                         player_target = player;
                         attack_target = null;
@@ -297,7 +302,7 @@ namespace SurvivalEngine
                     {
                         float dangle = detect_angle / 2f; // /2 for each side
                         float angle = Vector3.Angle(transform.forward, dir.normalized);
-                        if (anyside || angle < dangle || dir.magnitude < detect_360_range)
+                        if (angle < dangle || dir.magnitude < detect_360_range)
                         {
                             //Find destructible to attack
                             if (HasAttackBehavior())
@@ -339,7 +344,7 @@ namespace SurvivalEngine
         {
             GameObject target = GetTarget();
 
-            if (target == null)
+            if (target == null || IsDead())
                 return;
 
             if (HasEscapeBehavior())
@@ -468,42 +473,53 @@ namespace SurvivalEngine
             lure_interest = 8f;
         }
 
-        private void OnTakeDamage()
+        private void OnDamaged()
         {
             if (IsDead())
                 return;
 
-            DetectThreat(99f, true);
-            ReactToThreat();
-
             if (onDamaged != null)
                 onDamaged.Invoke();
+
+            if (animator != null)
+                animator.SetTrigger("Damaged");
         }
 
-        private void OnKill()
+        private void OnDamagedPlayer(PlayerCharacter player)
+        {
+            if (IsDead() || state_timer < 2f)
+                return;
+
+            player_target = player;
+            attack_target = null;
+            ReactToThreat();
+        }
+
+        private void OnDamagedCharacter(Character character)
+        {
+            if (IsDead() || state_timer < 2f)
+                return;
+
+            player_target = null;
+            attack_target = character.GetDestructible();
+            ReactToThreat();
+        }
+
+        private void OnDeath()
         {
             state = AnimalState.Dead;
 
             if (onDeath != null)
                 onDeath.Invoke();
+
+            if (animator != null)
+                animator.SetTrigger("Death");
         }
 
         void OnAttack()
         {
             if (animator != null)
                 animator.SetTrigger("Attack");
-        }
-
-        void OnDamaged()
-        {
-            if (animator != null)
-                animator.SetTrigger("Damaged");
-        }
-
-        void OnDeath()
-        {
-            if (animator != null)
-                animator.SetTrigger("Death");
         }
 
         public bool HasAttackBehavior()

@@ -22,8 +22,11 @@ namespace SurvivalEngine
         public float attack_windout = 0.4f; //Timing (in secs) between the hit and the end of the attack
         public float attack_energy = 1f; //Energy cost to attack
 
-        [Header("Audio")]
+        [Header("FX")]
+        public GameObject hit_fx;
+        public GameObject death_fx;
         public AudioClip hit_sound;
+        public AudioClip death_sound;
 
         public UnityAction<Destructible, bool> onAttack;
         public UnityAction<Destructible> onAttackHit;
@@ -33,8 +36,10 @@ namespace SurvivalEngine
         private PlayerCharacter character;
         private PlayerCharacterAttribute character_attr;
 
+        private Coroutine attack_routine = null;
         private float attack_timer = 0f;
         private bool is_dead = false;
+        private bool is_attacking = false;
 
         private void Awake()
         {
@@ -98,6 +103,8 @@ namespace SurvivalEngine
 
             TheCamera.Get().Shake();
             TheAudio.Get().PlaySFX("player", hit_sound);
+            if (hit_fx != null)
+                Instantiate(hit_fx, transform.position, Quaternion.identity);
 
             if (onDamaged != null)
                 onDamaged.Invoke();
@@ -111,6 +118,10 @@ namespace SurvivalEngine
             character.StopMove();
             is_dead = true;
 
+            TheAudio.Get().PlaySFX("player", death_sound);
+            if (death_fx != null)
+                Instantiate(death_fx, transform.position, Quaternion.identity);
+
             if (onDeath != null)
                 onDeath.Invoke();
         }
@@ -121,7 +132,7 @@ namespace SurvivalEngine
             if (!character.IsDoingAction())
             {
                 attack_timer = -10f;
-                StartCoroutine(AttackRun(resource));
+                attack_routine = StartCoroutine(AttackRun(resource));
             }
         }
 
@@ -130,7 +141,7 @@ namespace SurvivalEngine
             if (!character.IsDoingAction() && HasRangedWeapon())
             {
                 attack_timer = -10f;
-                StartCoroutine(AttackRunNoTarget());
+                attack_routine = StartCoroutine(AttackRunNoTarget());
             }
         }
 
@@ -138,6 +149,7 @@ namespace SurvivalEngine
         private IEnumerator AttackRun(Destructible target)
         {
             character.SetDoingAction(true);
+            is_attacking = true;
 
             bool is_ranged = target != null && CanWeaponAttackRanged(target);
 
@@ -152,6 +164,9 @@ namespace SurvivalEngine
             float windup = GetAttackWindup();
             yield return new WaitForSeconds(windup);
 
+            //Durability
+            character.Inventory.UpdateAllEquippedItemsDurability(true, -1f);
+
             int nb_strikes = GetAttackStrikes(target);
             float strike_interval = GetAttackStikesInterval(target);
 
@@ -162,9 +177,7 @@ namespace SurvivalEngine
                 nb_strikes--;
             }
 
-            //Durability
-            character.Inventory.UpdateAllEquippedItemsDurability(true, -1f);
-
+            //Reset timer
             attack_timer = 0f;
 
             //Wait for the end of the attack before character can move again
@@ -172,12 +185,14 @@ namespace SurvivalEngine
             yield return new WaitForSeconds(windout);
 
             character.SetDoingAction(false);
+            is_attacking = false;
         }
 
         //Ranged attack without a target
         private IEnumerator AttackRunNoTarget()
         {
             character.SetDoingAction(true);
+            is_attacking = true;
 
             //Rotate toward 
             bool freerotate = TheCamera.Get().IsFreeRotation();
@@ -192,6 +207,9 @@ namespace SurvivalEngine
             float windup = GetAttackWindup();
             yield return new WaitForSeconds(windup);
 
+            //Durability
+            character.Inventory.UpdateAllEquippedItemsDurability(true, -1f);
+
             int nb_strikes = GetAttackStrikes();
             float strike_interval = GetAttackStikesInterval();
 
@@ -202,9 +220,7 @@ namespace SurvivalEngine
                 nb_strikes--;
             }
 
-            //Durability
-            character.Inventory.UpdateAllEquippedItemsDurability(true, -1f);
-
+            //Reset timer
             attack_timer = 0f;
 
             //Wait for the end of the attack before character can move again
@@ -212,6 +228,7 @@ namespace SurvivalEngine
             yield return new WaitForSeconds(windout);
 
             character.SetDoingAction(false);
+            is_attacking = false;
         }
 
         private void DoAttackStrike(Destructible target, bool is_ranged)
@@ -225,18 +242,20 @@ namespace SurvivalEngine
                 if (projectile != null && CanWeaponAttackRanged(target))
                 {
                     character.Inventory.UseItem(projectile, 1);
-                    Vector3 pos = GetProjectileSpawnPos(equipped);
+                    Vector3 pos = GetProjectileSpawnPos();
                     Vector3 dir = target.GetCenter() - pos;
                     GameObject proj = Instantiate(projectile.projectile_prefab, pos, Quaternion.LookRotation(dir.normalized, Vector3.up));
-                    proj.GetComponent<Projectile>().dir = dir.normalized;
-                    proj.GetComponent<Projectile>().damage = equipped.damage;
+                    Projectile project = proj.GetComponent<Projectile>();
+                    project.shooter = character;
+                    project.dir = dir.normalized;
+                    project.damage = equipped.damage;
                 }
             }
 
             //Melee attack
             else if (IsAttackTargetInRange(target))
             {
-                target.TakeDamage(GetAttackDamage(target));
+                target.TakeDamage(character, GetAttackDamage(target));
 
                 if (onAttackHit != null)
                     onAttackHit.Invoke(target);
@@ -255,17 +274,42 @@ namespace SurvivalEngine
                 if (projectile != null)
                 {
                     character.Inventory.UseItem(projectile, 1);
-                    Vector3 pos = GetProjectileSpawnPos(equipped);
+                    Vector3 pos = GetProjectileSpawnPos();
                     Vector3 dir = transform.forward;
                     bool freerotate = TheCamera.Get().IsFreeRotation();
                     if (freerotate)
-                        dir = TheCamera.Get().GetAimDir(character);
+                        dir = TheCamera.Get().GetFacingDir();
 
                     GameObject proj = Instantiate(projectile.projectile_prefab, pos, Quaternion.LookRotation(dir.normalized, Vector3.up));
-                    proj.GetComponent<Projectile>().dir = dir.normalized;
-                    proj.GetComponent<Projectile>().damage = equipped.damage;
+                    Projectile project = proj.GetComponent<Projectile>();
+                    project.shooter = character;
+                    project.dir = dir.normalized;
+                    project.damage = equipped.damage;
+
+                    if (freerotate)
+                        project.SetInitialCurve(TheCamera.Get().GetAimDir(character));
                 }
             }
+        }
+
+        //Cancel current attack
+        public void CancelAttack()
+        {
+            if (is_attacking)
+            {
+                is_attacking = false;
+                attack_timer = 0f;
+                character.SetDoingAction(false);
+                character.StopAutoMove();
+                if (attack_routine != null)
+                    StopCoroutine(attack_routine);
+            }
+        }
+
+        //Is the player currently attacking?
+        public bool IsAttacking()
+        {
+            return is_attacking;
         }
 
         //Does Attack has priority on actions?
@@ -369,10 +413,10 @@ namespace SurvivalEngine
             return 1f * character.Attributes.GetAttackMult();
         }
 
-        public Vector3 GetProjectileSpawnPos(ItemData weapon)
+        public Vector3 GetProjectileSpawnPos()
         {
-            EquipSlot weapon_slot = character.EquipData.GetEquippedWeaponSlot();
-            EquipAttach attach = character.Inventory.GetEquipAttachment(weapon_slot, weapon.equip_side);
+            ItemData weapon = character.EquipData.GetEquippedWeaponData();
+            EquipAttach attach = character.Inventory.GetEquipAttachment(weapon.equip_slot, weapon.equip_side);
             if (attach != null)
                 return attach.transform.position;
             return transform.position + Vector3.up;

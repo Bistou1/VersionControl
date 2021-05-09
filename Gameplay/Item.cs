@@ -20,6 +20,7 @@ namespace SurvivalEngine
         public int quantity = 1;
 
         [Header("FX")]
+        public float auto_collect_range = 0f; //Will automatically be collected when in range
         public bool snap_to_ground = true; //If true, item will be automatically placed on the ground instead of floating if spawns in the air
         public AudioClip take_audio;
         public GameObject take_fx;
@@ -83,6 +84,13 @@ namespace SurvivalEngine
                     if (data.HasDurability() && dropped_item.durability <= 0f)
                         DestroyItem(); //Destroy item from durability
                 }
+            }
+
+            if (auto_collect_range > 0.1f)
+            {
+                PlayerCharacter player = PlayerCharacter.GetNearest(transform.position, auto_collect_range);
+                if (player != null)
+                    player.Inventory.AutoTakeItem(this);
             }
         }
 

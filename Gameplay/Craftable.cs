@@ -10,7 +10,7 @@ namespace SurvivalEngine
 
     [RequireComponent(typeof(Selectable))]
     [RequireComponent(typeof(UniqueID))]
-    public class Craftable : MonoBehaviour
+    public abstract class Craftable : MonoBehaviour
     {
         private Selectable cselect;
 

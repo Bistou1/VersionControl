@@ -46,6 +46,7 @@ namespace SurvivalEngine
         private bool position_set = false;
         private bool visible_set = true;
         private Color prev_color = Color.white;
+        private float manual_rotate = 0f;
         private float update_timer = 0f;
 
         private List<Collider> colliders = new List<Collider>();
@@ -101,18 +102,21 @@ namespace SurvivalEngine
                 {
                     if (constrols.IsGamePad())
                     {
-                        //Controller/Mobile building
+                        //Controller Game Pad building
                         transform.position = building_character.transform.position + building_character.transform.forward * build_distance;
-                        transform.rotation = Quaternion.LookRotation(building_character.GetFacing(), Vector3.up);
-                        FindAutoPosition();
+                        transform.rotation = Quaternion.Euler(0f, manual_rotate, 0f) * Quaternion.LookRotation(building_character.GetFacing(), Vector3.up);
                     }
-                    else if(mouse.IsUsingMouse() || Mathf.Abs(constrols.GetRotateCam()) > 0.1f){
-                        //Mouse building
+                    else
+                    {
+                        //Mouse/Touch controls
                         transform.position = mouse.GetPointingPos();
-                        transform.rotation = TheCamera.Get().GetFacingRotation();
-                        FindAutoPosition();
+                        transform.rotation = Quaternion.Euler(0f, manual_rotate, 0f) * TheCamera.Get().GetFacingRotation();
                     }
 
+                    //Snap to grid
+                    FindAutoPosition();
+
+                    //Show/Hide on mobile
                     if (TheGame.IsMobile())
                     {
                         SetBuildVisible(mouse.IsMouseHold());
@@ -220,6 +224,15 @@ namespace SurvivalEngine
             
             if (onBuild != null)
                 onBuild.Invoke();
+        }
+
+        //Call this function to rotate building manually (like by using a key)
+        public void RotateManually(float angle_y)
+        {
+            if (building_mode)
+            {
+                manual_rotate += angle_y;
+            }
         }
 
         private void SetModelColor(Color color, bool replace)
@@ -368,11 +381,11 @@ namespace SurvivalEngine
             bool f2 = PhysicsTool.RaycastCollision(p2, dir, out h2);
             bool f3 = PhysicsTool.RaycastCollision(p3, dir, out h3);
             bool f4 = PhysicsTool.RaycastCollision(p4, dir, out h4);
-            f0 = f0 && PhysicsTool.IsLayerIsInLayerMask(h0.collider.gameObject.layer, floor_layer);
-            f1 = f1 && PhysicsTool.IsLayerIsInLayerMask(h1.collider.gameObject.layer, floor_layer);
-            f2 = f2 && PhysicsTool.IsLayerIsInLayerMask(h2.collider.gameObject.layer, floor_layer);
-            f3 = f3 && PhysicsTool.IsLayerIsInLayerMask(h3.collider.gameObject.layer, floor_layer);
-            f4 = f4 && PhysicsTool.IsLayerIsInLayerMask(h4.collider.gameObject.layer, floor_layer);
+            f0 = f0 && PhysicsTool.IsLayerInLayerMask(h0.collider.gameObject.layer, floor_layer);
+            f1 = f1 && PhysicsTool.IsLayerInLayerMask(h1.collider.gameObject.layer, floor_layer);
+            f2 = f2 && PhysicsTool.IsLayerInLayerMask(h2.collider.gameObject.layer, floor_layer);
+            f3 = f3 && PhysicsTool.IsLayerInLayerMask(h3.collider.gameObject.layer, floor_layer);
+            f4 = f4 && PhysicsTool.IsLayerInLayerMask(h4.collider.gameObject.layer, floor_layer);
 
             if(build_flat_floor)
                 return f1 && f2 && f3 && f4 && f0; //Floor must be valid on all sides

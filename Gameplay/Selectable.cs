@@ -214,7 +214,7 @@ namespace SurvivalEngine
         {
             foreach (SAction action in actions)
             {
-                if (action is AAction)
+                if (action != null && action is AAction)
                 {
                     AAction aaction = (AAction)action;
                     if (aaction.CanDoAction(character, this))

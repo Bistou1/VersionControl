@@ -39,7 +39,7 @@ namespace SurvivalEngine
                 swimming_fx.SetActive(false);
             }
 
-            foreach (int layer in PhysicsTool.LayerMaskToLayer(water_obstacle_layer))
+            foreach (int layer in PhysicsTool.LayerMaskToLayers(water_obstacle_layer))
                 Physics.IgnoreLayerCollision(gameObject.layer, layer);
         }
 
@@ -66,9 +66,9 @@ namespace SurvivalEngine
                 return;
 
             //Swim
-            if (!is_swimming && PhysicsTool.IsAnyLayerIsInLayerMask(cground_layers, water_layer))
+            if (!is_swimming && PhysicsTool.IsAnyLayerInLayerMask(cground_layers, water_layer))
                 StartSwim();
-            else if (is_swimming && !PhysicsTool.IsAnyLayerIsInLayerMask(cground_layers, water_layer))
+            else if (is_swimming && !PhysicsTool.IsAnyLayerInLayerMask(cground_layers, water_layer))
                 StopSwimming();
 
             //Swim adjust offset

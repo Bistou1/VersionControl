@@ -13,13 +13,6 @@ namespace SurvivalEngine
         CantAttack =50, //Cannot be attacked
     }
 
-    [System.Serializable]
-    public struct RandomLoot
-    {
-        public CraftData item;
-        public float probability; //Between 0 and 1
-    }
-
     /// <summary>
     /// Destructibles are objects that can be destroyed. They have HP and can be damaged by the player or by animals. 
     /// They often spawn loot items when destroyed (or killed)
@@ -43,8 +36,7 @@ namespace SurvivalEngine
 
         [Header("Loot")]
         public int xp = 0;
-        public CraftData[] loots;
-        public RandomLoot[] loots_random;
+        public SData[] loots;
 
         [Header("FX")]
         public bool shake_on_hit = true; //Shake animation when hit
@@ -58,6 +50,8 @@ namespace SurvivalEngine
         public AudioClip death_sound;
 
         //Events
+        public UnityAction<Character> onDamagedByCharacter;
+        public UnityAction<PlayerCharacter> onDamagedByPlayer;
         public UnityAction onDamaged;
         public UnityAction onDeath;
 
@@ -141,8 +135,48 @@ namespace SurvivalEngine
             }
         }
 
-        //Deal damages to the destructible, if it reaches 0 HP it will be killed
+        //Deal damage from character
+        public void TakeDamage(Character attacker, int damage)
+        {
+            if (!dead)
+            {
+                ApplyDamage(damage);
+
+                onDamagedByCharacter?.Invoke(attacker);
+
+                if (hp <= 0)
+                    Kill();
+            }
+        }
+
+        //Deal damage from player
+        public void TakeDamage(PlayerCharacter attacker, int damage)
+        {
+            if (!dead)
+            {
+                ApplyDamage(damage);
+
+                onDamagedByPlayer?.Invoke(attacker);
+
+                if (hp <= 0)
+                    Kill();
+            }
+        }
+
+        //Take damage from no sources (like trap)
         public void TakeDamage(int damage)
+        {
+            if (!dead)
+            {
+                ApplyDamage(damage);
+
+                if (hp <= 0)
+                    Kill();
+            }
+        }
+
+        //Deal damages to the destructible, if it reaches 0 HP it will be killed
+        private void ApplyDamage(int damage)
         {
             if (!dead)
             {
@@ -162,11 +196,7 @@ namespace SurvivalEngine
                     TheAudio.Get().PlaySFX("destruct", hit_sound);
                 }
 
-                if (onDamaged != null)
-                    onDamaged.Invoke();
-
-                if (hp <= 0)
-                    Kill();
+                onDamaged?.Invoke();
             }
         }
 
@@ -226,23 +256,6 @@ namespace SurvivalEngine
             }
         }
 
-        public void SpawnLoots()
-        {
-            //Loot
-            foreach (CraftData item in loots)
-            {
-                SpawnLoot(item);
-            }
-
-            foreach (RandomLoot loot in loots_random)
-            {
-                if (Random.value < loot.probability)
-                {
-                    SpawnLoot(loot.item);
-                }
-            }
-        }
-
         public void GiveXPLoot()
         {
             foreach (PlayerCharacter player in PlayerCharacter.GetAll())
@@ -266,8 +279,19 @@ namespace SurvivalEngine
             }
         }
 
-        public void SpawnLoot(CraftData item, int quantity=1)
+        public void SpawnLoots()
         {
+            foreach (SData item in loots)
+            {
+                SpawnLoot(item);
+            }
+        }
+
+        public void SpawnLoot(SData item, int quantity=1)
+        {
+            if (item == null || quantity <= 0)
+                return;
+
             Vector3 pos = GetLootRandomPos();
             if (item is ItemData)
             {
@@ -283,6 +307,14 @@ namespace SurvivalEngine
             {
                 PlantData plant_data = (PlantData)item;
                 Plant.Create(plant_data, pos, 0);
+            }
+            if (item is LootData)
+            {
+                LootData loot = (LootData)item;
+                if (Random.value <= loot.probability)
+                {
+                    SpawnLoot(loot.item, loot.quantity);
+                }
             }
         }
 

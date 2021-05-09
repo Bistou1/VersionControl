@@ -122,6 +122,34 @@ namespace SurvivalEngine
             }
         }
 
+        //Auto take item, without animation, facing, action
+        public void AutoTakeItem(Item item)
+        {
+            if (BagData != null && !InventoryData.CanTakeItem(item.data.id, item.quantity))
+            {
+                AutoTakeItem(BagData, item); //Take into bag
+            }
+            else
+            {
+                AutoTakeItem(InventoryData, item); //Take into main inventory
+            }
+        }
+
+        public void AutoTakeItem(InventoryData inventory, Item item)
+        {
+            if (item != null && !character.IsDoingAction() && inventory.CanTakeItem(item.data.id, item.quantity))
+            {
+                PlayerData pdata = PlayerData.Get();
+                DroppedItemData dropped_item = pdata.GetDroppedItem(item.GetUID());
+                float durability = dropped_item != null ? dropped_item.durability : item.data.durability;
+                int slot = inventory.AddItem(item.data.id, item.quantity, durability, item.GetUID()); //Add to inventory
+
+                ItemTakeFX.DoTakeFX(item.transform.position, item.data, inventory.type, slot);
+
+                item.TakeItem(); //Destroy item
+            }
+        }
+
         //Gain an new item directly to inventory
         public void GainItem(ItemData item, int quantity=1)
         {

@@ -22,16 +22,17 @@ namespace SurvivalEngine
         public bool move_enabled = true;
         public float move_speed = 2f;
         public float rotate_speed = 250f;
-        public bool avoid_obstacles = true;
-        public bool use_navmesh = false;
+        public float moving_threshold = 0.15f; //Move threshold is how fast the character need to move before its considered movement (triggering animations, etc)
+        public bool avoid_obstacles = true; //More performant alternative to navmesh, will raycast to see if there are obstacles in front, then move around them
+        public bool use_navmesh = false; //Use the real unity navmesh
 
         [Header("Ground/Falling")]
         public float fall_speed = 20f;
-        public float slope_angle_max = 45f;
-        public float ground_detect_dist = 0.1f;
-        public LayerMask ground_layer = ~0;
-        public float ground_refresh_rate = 0.2f;
-
+        public float slope_angle_max = 45f; //Maximum angle, in degrees that the character can climb up
+        public float ground_detect_dist = 0.1f; //Margin distance between the character and the ground, used to detect if character is grounded.
+        public LayerMask ground_layer = ~0; //What is considered ground?
+        public float ground_refresh_rate = 0.2f; //Refresh rate for ground detection, higher value for performance, lower for accuracy, 0 = every frame
+        
         [Header("Attack")]
         public bool attack_enabled = true;
         public int attack_damage = 10;
@@ -119,7 +120,8 @@ namespace SurvivalEngine
             move_target = transform.position;
             move_target_avoid = transform.position;
 
-            selectable.onDestroy += OnDeath;
+            destruct.onDamaged += OnDamaged;
+            destruct.onDeath += OnDeath;
 
             if (buildable != null)
                 buildable.onBuild += OnBuild;
@@ -184,7 +186,7 @@ namespace SurvivalEngine
                     move_target_avoid = nav_paths[path_index];
                     Vector3 dir_total = move_target_avoid - transform.position;
                     dir_total.y = 0f;
-                    if (dir_total.magnitude < 0.2f)
+                    if (dir_total.magnitude < moving_threshold * 2f)
                         path_index++;
                 }
 
@@ -208,15 +210,14 @@ namespace SurvivalEngine
                     Vector3 move_dir_total = move_target - transform.position;
                     Vector3 move_dir_next = move_target_avoid - transform.position;
                     Vector3 move_dir = move_dir_next.normalized * Mathf.Min(move_dir_total.magnitude, 1f);
-                    //move_dir.y = 0f;
-
                     tmove = move_dir.normalized * Mathf.Min(move_dir.magnitude, 1f) * move_speed;
-                    Vector3 tface = new Vector3(tmove.x, 0f, tmove.z);
+                }
 
-                    if (move_dir_total.magnitude > 0.1f && tface.magnitude > 0.1f)
-                    {
-                        facing = tface.normalized;
-                    }
+                //Facing
+                if (IsMoving())
+                {
+                    Vector3 tface = new Vector3(moving.x, 0f, moving.z);
+                    facing = tface.normalized;
                 }
 
                 //Rotation
@@ -289,7 +290,7 @@ namespace SurvivalEngine
             PlayerData.Get().SetCharacterPosition(GetUID(), SceneNav.GetCurrentScene(), transform.position, transform.rotation);
 
             //Stop moving
-            if (is_moving && !HasTarget() && HasReachedMoveTarget())
+            if (is_moving && !HasTarget() && HasReachedMoveTarget(moving_threshold * 2f))
                 Stop();
 
             //Stop attacking
@@ -374,7 +375,7 @@ namespace SurvivalEngine
                         if (range < GetAttackTargetHitRange())
                         {
                             if(attack_target != null)
-                                attack_target.TakeDamage(attack_damage);
+                                attack_target.TakeDamage(this, attack_damage);
                             if (attack_player != null)
                                 attack_player.Combat.TakeDamage(attack_damage);
                         }
@@ -628,6 +629,12 @@ namespace SurvivalEngine
             }
         }
 
+        private void OnDamaged()
+        {
+            if (onDamaged != null)
+                onDamaged.Invoke();
+        }
+
         private void OnDeath()
         {
             rigid.velocity = Vector3.zero;
@@ -664,7 +671,13 @@ namespace SurvivalEngine
             return transform.position + targ_dir;
         }
 
-        public bool HasReachedMoveTarget(float distance=0.11f)
+        //Did it reach its target destination?
+        public bool HasReachedMoveTarget()
+        {
+            return HasReachedMoveTarget(moving_threshold * 2f); //Double threshold to make sure it doesn't stop moving before reaching it
+        }
+
+        public bool HasReachedMoveTarget(float distance)
         {
             Vector3 diff = move_target - transform.position;
             return (diff.magnitude < distance);
@@ -715,7 +728,7 @@ namespace SurvivalEngine
         public bool IsMoving()
         {
             Vector3 moveXZ = new Vector3(moving.x, 0f, moving.z);
-            return is_moving && moveXZ.magnitude > 0.2f;
+            return is_moving && moveXZ.magnitude > moving_threshold;
         }
 
         //Order to move given

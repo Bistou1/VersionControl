@@ -27,7 +27,7 @@ namespace SurvivalEngine
         public float fall_speed = 20f; //Falling speed
         public float fall_gravity = 40f; //Falling acceleration
         public float slope_angle_max = 45f; //Maximum angle, in degrees that the character can climb up
-        public float moving_threshold = 0.1f; //Move threshold is how fast the character need to move before its considered movement (triggering animations, etc)
+        public float moving_threshold = 0.15f; //Move threshold is how fast the character need to move before its considered movement (triggering animations, etc)
         public float ground_detect_dist = 0.1f; //Margin distance between the character and the ground, used to detect if character is grounded.
         public LayerMask ground_layer = ~0; //What is considered ground?
         public bool use_navmesh = false;
@@ -292,7 +292,7 @@ namespace SurvivalEngine
             }
 
             //Stop move & drop when near clicked spot
-            if (auto_move && !is_action && move_dir.magnitude < 0.35f)
+            if (auto_move && !is_action && move_dir.magnitude < moving_threshold * 2f)
             {
                 auto_move = false;
                 character_inventory.DropItem(auto_move_drop_inventory, auto_move_drop);

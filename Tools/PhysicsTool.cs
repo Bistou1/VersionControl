@@ -98,7 +98,7 @@ namespace SurvivalEngine
             Vector3 start_pos = pos + Vector3.up * max_y;
             RaycastHit rhit;
             bool is_hit = Physics.Raycast(start_pos, Vector3.down, out rhit, max_y * 2f, ~0, QueryTriggerInteraction.Ignore);
-            bool is_in_right_layer = is_hit && rhit.collider != null && IsLayerIsInLayerMask(rhit.collider.gameObject.layer, ground_layer.value);
+            bool is_in_right_layer = is_hit && rhit.collider != null && IsLayerInLayerMask(rhit.collider.gameObject.layer, ground_layer.value);
             ground_pos = rhit.point;
             return is_hit && is_in_right_layer;
         }
@@ -120,16 +120,16 @@ namespace SurvivalEngine
             return Physics.Raycast(pos, dir.normalized, out hit, dir.magnitude, ~0, QueryTriggerInteraction.Ignore);
         }
 
-        public static bool IsLayerIsInLayerMask(int layer, LayerMask mask)
+        public static bool IsLayerInLayerMask(int layer, LayerMask mask)
         {
             return (LayerToLayerMask(layer).value & mask.value) > 0;
         }
 
-        public static bool IsAnyLayerIsInLayerMask(int[] layers, LayerMask mask)
+        public static bool IsAnyLayerInLayerMask(int[] layers, LayerMask mask)
         {
             bool is_in_layer = false;
             for (int i = 0; i < layers.Length; i++)
-                is_in_layer = is_in_layer || IsLayerIsInLayerMask(layers[i], mask);
+                is_in_layer = is_in_layer || IsLayerInLayerMask(layers[i], mask);
             return is_in_layer;
         }
 
@@ -138,7 +138,7 @@ namespace SurvivalEngine
             return (LayerMask) 1 << layer;
         }
 
-        public static List<int> LayerMaskToLayer(LayerMask mask)
+        public static List<int> LayerMaskToLayers(LayerMask mask)
         {
             uint bits = (uint)mask.value;
             List<int> layers = new List<int>();
@@ -146,7 +146,7 @@ namespace SurvivalEngine
             {
                 if ((bits >> i) > 0)
                 {
-                    bits = ((bits << 32 - i) >> 32 - i);
+                    bits = (bits << (32 - i)) >> (32 - i);
                     layers.Add(i);
                 }
             }

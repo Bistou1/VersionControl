@@ -9,7 +9,7 @@ namespace SurvivalEngine
     public class Storage : MonoBehaviour
     {
         public int storage_size = 10;
-        public ItemData[] starting_items;
+        public SData[] starting_items;
 
         private UniqueID unique_id;
 
@@ -35,10 +35,19 @@ namespace SurvivalEngine
                 if (!has_inventory)
                 {
                     InventoryData invdata = InventoryData.Get(InventoryType.Storage, unique_id.unique_id);
-                    foreach (ItemData item in starting_items)
+                    foreach (SData data in starting_items)
                     {
-                        if (item != null)
+                        if (data != null && data is ItemData)
+                        {
+                            ItemData item = (ItemData)data;
                             invdata.AddItem(item.id, 1, item.durability, UniqueID.GenerateUniqueID());
+                        }
+                        if (data != null && data is LootData)
+                        {
+                            LootData item = (LootData)data;
+                            if (Random.value <= item.probability)
+                                invdata.AddItem(item.item.id, item.quantity, item.item.durability, UniqueID.GenerateUniqueID());
+                        }
                     }
                 }
             }

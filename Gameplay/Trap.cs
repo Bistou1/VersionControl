@@ -17,6 +17,7 @@ namespace SurvivalEngine
         public GameObject active_model;
         public GameObject triggered_model;
 
+        private Construction construct;
         private Buildable buildable;
         private bool triggered = false;
         private float trigger_timer = 0f;
@@ -25,6 +26,7 @@ namespace SurvivalEngine
         {
             active_model.SetActive(true);
             triggered_model.SetActive(false);
+            construct = GetComponent<Construction>();
             buildable = GetComponent<Buildable>();
         }
 
@@ -46,6 +48,14 @@ namespace SurvivalEngine
                 active_model.SetActive(false);
                 triggered_model.SetActive(true);
 
+                //Durability
+                if (construct != null) {
+                    BuiltConstructionData bdata = PlayerData.Get().GetConstructed(construct.GetUID());
+                    if (bdata != null && construct.data != null && construct.data.durability_type == DurabilityType.UsageCount)
+                        bdata.durability -= 1f;
+                }
+
+                //Deal damage
                 if (triggerer)
                     triggerer.GetDestructible().TakeDamage(damage);
             }
