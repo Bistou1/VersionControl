@@ -12,7 +12,7 @@ namespace SurvivalEngine.WorldGen
         public float probability;
     }
 
-    [CreateAssetMenu(fileName = "BiomeSpawn", menuName = "SurvivalEngine/WorldGen/BiomeSpawn", order = 100)]
+    [CreateAssetMenu(fileName = "BiomeSpawn", menuName = "Data/BiomeSpawn", order = 10)]
     public class BiomeSpawnData : ScriptableObject
     {
         [Header("Spawns")]
@@ -22,11 +22,7 @@ namespace SurvivalEngine.WorldGen
         [Range(1f, 100f)]
         [Tooltip("Variance determine if objects are evenly distributed or not")]
         public float variance = 50f;
-
-        public bool random_rotation = false;
-        [Range(0f, 0.5f)]
-        public float random_scale = 0f;
-
+       
         public BiomeSpawn[] spawns;
 
         public GameObject PickRandomPrefab()

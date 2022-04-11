@@ -5,7 +5,7 @@ using UnityEngine;
 namespace SurvivalEngine.WorldGen
 {
 
-    [CreateAssetMenu(fileName = "Biome", menuName = "SurvivalEngine/WorldGen/Biome", order = 100)]
+    [CreateAssetMenu(fileName = "Biome", menuName = "Data/Biome", order = 10)]
     public class BiomeData : ScriptableObject
     {
         public string id;

@@ -22,12 +22,6 @@ namespace SurvivalEngine.WorldGen
         private Dictionary<GameObject, float> group_size = new Dictionary<GameObject, float>();
         private Dictionary<GameObject, float> collider_size = new Dictionary<GameObject, float>();
 
-        private void Start()
-        {
-            //Add code to do at start
-
-        }
-
         public void ClearTerrain()
         {
             for (int i = transform.childCount - 1; i >= 0; i--)
@@ -76,7 +70,7 @@ namespace SurvivalEngine.WorldGen
             fcollider.transform.SetParent(floor.transform);
             fcollider.transform.position = floor.transform.position;
             fcollider.isStatic = true;
-            fcollider.layer = 14; //Water wall layer
+            fcollider.layer = floor.layer;
 
             MeshRenderer crender = fcollider.AddComponent<MeshRenderer>();
             MeshFilter cmesh = fcollider.AddComponent<MeshFilter>();
@@ -104,7 +98,7 @@ namespace SurvivalEngine.WorldGen
             scollide.isTrigger = true;
 
             Selectable selectable = fselect.AddComponent<Selectable>();
-            selectable.type = SelectableType.InteractSurface;
+            selectable.surface = true;
 
             if (WorldGenerator.Get())
             {
@@ -191,10 +185,6 @@ namespace SurvivalEngine.WorldGen
                             {
                                 GameObject nobj = InstantiatePrefab(prefab, parent.transform);
                                 nobj.transform.position = pos;
-                                if(data.random_rotation)
-                                    nobj.transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
-                                if (data.random_scale > 0.01f)
-                                    nobj.transform.localScale = Vector3.one * (1f + Random.Range(-data.random_scale, data.random_scale));
 
                                 if (properties == null)
                                 {
@@ -307,7 +297,6 @@ namespace SurvivalEngine.WorldGen
         {
             List<Vector3> vertices = new List<Vector3>(aMesh.vertices);
             List<Vector3> normals = new List<Vector3>(aMesh.normals);
-            List<Vector2> uvs = new List<Vector2>(aMesh.uv);
             List<int> triangles = new List<int>(aMesh.triangles);
             Vector3 center = FindZoneCenter();
             int nb_vertices = aMesh.vertices.Length;
@@ -343,10 +332,6 @@ namespace SurvivalEngine.WorldGen
                 normals.Add(normal);
                 normals.Add(normal);
                 normals.Add(normal);
-                uvs.Add(FindUVEdge(v1));
-                uvs.Add(FindUVEdge(v2));
-                uvs.Add(FindUVEdge(v3));
-                uvs.Add(FindUVEdge(v4));
 
                 triangles.Add(vertices.Count - 4); //Top
                 triangles.Add(vertices.Count - 3); //Bottom
@@ -359,14 +344,12 @@ namespace SurvivalEngine.WorldGen
             aMesh.vertices = vertices.ToArray();
             aMesh.triangles = triangles.ToArray();
             aMesh.normals = normals.ToArray();
-            aMesh.uv = uvs.ToArray();
         }
 
         private void AddMeshFace(Mesh aMesh, Vector3 normal, float elevation, bool local)
         {
             List<Vector3> vertices = new List<Vector3>(aMesh.vertices);
             List<Vector3> normals = new List<Vector3>(aMesh.normals);
-            List<Vector2> uvs = new List<Vector2>(aMesh.uv);
             List<int> triangles = new List<int>(aMesh.triangles);
             int nb_vertices = vertices.Count;
 
@@ -377,7 +360,6 @@ namespace SurvivalEngine.WorldGen
 
             vertices.Add(center);
             normals.Add(normal);
-            uvs.Add(FindUV(center));
 
             for (int j = 0; j < points.Length; j++)
             {
@@ -388,7 +370,6 @@ namespace SurvivalEngine.WorldGen
 
                 vertices.Add(point);
                 normals.Add(normal);
-                uvs.Add(FindUV(point));
 
                 if (normal.y > 0f)
                 {
@@ -427,19 +408,8 @@ namespace SurvivalEngine.WorldGen
             aMesh.vertices = vertices.ToArray();
             aMesh.triangles = triangles.ToArray();
             aMesh.normals =  normals.ToArray();
-            aMesh.uv =  uvs.ToArray();
 
             //aMesh.RecalculateNormals();
-        }
-
-        private Vector2 FindUV(Vector3 pos)
-        {
-            return new Vector2(pos.x, pos.z);
-        }
-
-        private Vector2 FindUVEdge(Vector3 pos)
-        {
-            return new Vector2((pos.x + pos.z), pos.y);
         }
 
         private Vector3 FindZoneCenter()
@@ -459,8 +429,7 @@ namespace SurvivalEngine.WorldGen
                 return;
 
             //Display the voronoi diagram
-            Color random_color = new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f));
-            Gizmos.color = MaterialTool.HasColor(data.floor_material) ? data.floor_material.color : random_color;
+            Gizmos.color = data.floor_material ? data.floor_material.color : Color.black;
 
             Mesh triangleMesh = new Mesh();
             AddMeshFace(triangleMesh, Vector3.up, 0f, false);

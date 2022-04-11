@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
-using UnityEngine.Events;
 
 namespace SurvivalEngine.WorldGen
 {
@@ -42,15 +41,13 @@ namespace SurvivalEngine.WorldGen
         public Transform[] points;
         public GameObject[] walls;
 
-        public UnityAction afterWorldGen;
-
         private Dictionary<Vector3, GameObject> points_link = new Dictionary<Vector3, GameObject>();
 
         private static WorldGenerator _instance;
         
         private void Start()
         {
-            if (mode == WorldGeneratorMode.Runtime && Application.isPlaying)
+            if (mode == WorldGeneratorMode.Runtime)
             {
                 TheGame.Get().PauseScripts();
                 BlackPanel.Get().Show(true);
@@ -90,9 +87,6 @@ namespace SurvivalEngine.WorldGen
             GenerateAllUID();
             GenerateNavmesh();
             SaveWorld();
-
-            if (afterWorldGen != null)
-                afterWorldGen.Invoke();
         }
 
         public void ClearWorld()
@@ -171,8 +165,7 @@ namespace SurvivalEngine.WorldGen
                 start_biome = starting_zones[Random.Range(0, starting_zones.Count)];
 
             //Find closest zone
-            PlayerCharacter player = PlayerCharacter.GetFirst();
-            Vector3 player_pos = player ? player.transform.position : Vector3.zero;
+            Vector3 player_pos = PlayerCharacter.Get() ? PlayerCharacter.Get().transform.position : Vector3.zero;
             float min_dist = 999f;
             BiomeZone nearest = null;
             foreach (BiomeZone zone in zones)
