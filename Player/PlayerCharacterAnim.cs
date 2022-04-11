@@ -13,12 +13,8 @@ namespace SurvivalEngine
     public class PlayerCharacterAnim : MonoBehaviour
     {
         public string move_anim = "Move";
-        public string move_side_x = "MoveX";
-        public string move_side_z = "MoveZ";
         public string attack_anim = "Attack";
-        public string attack_speed = "AttackSpeed";
         public string take_anim = "Take";
-        public string craft_anim = "Craft";
         public string build_anim = "Build";
         public string damaged_anim = "Damaged";
         public string death_anim = "Death";
@@ -26,75 +22,49 @@ namespace SurvivalEngine
         public string fish_anim = "Fish";
         public string dig_anim = "Dig";
         public string water_anim = "Water";
-        public string hoe_anim = "Hoe";
-        public string ride_anim = "Ride";
-        public string swim_anim = "Swim";
-        public string climb_anim = "Climb";
 
         private PlayerCharacter character;
+        private PlayerCharacterEquip character_equip;
         private Animator animator;
+
+        private static PlayerCharacterAnim _instance;
 
         void Awake()
         {
+            _instance = this;
             character = GetComponent<PlayerCharacter>();
+            character_equip = GetComponent<PlayerCharacterEquip>();
             animator = GetComponentInChildren<Animator>();
+
+            character.onTakeItem += OnTake;
+            character.onBuild += OnBuild;
+            character.onAttack += OnAttack;
+            character.onAttackHit += OnAttackHit;
+            character.onJump += OnJump;
+            character.onDamaged += OnDamaged;
+            character.onDeath += OnDeath;
+            character.onTriggerAnim += OnTriggerAnim;
 
             if (animator == null)
                 enabled = false;
         }
 
-        private void Start()
-        {
-            character.Inventory.onTakeItem += OnTake;
-            character.Inventory.onDropItem += OnDrop;
-            character.Crafting.onCraft += OnCraft;
-            character.Crafting.onBuild += OnBuild;
-            character.Combat.onAttack += OnAttack;
-            character.Combat.onAttackHit += OnAttackHit;
-            character.Combat.onDamaged += OnDamaged;
-            character.Combat.onDeath += OnDeath;
-            character.onTriggerAnim += OnTriggerAnim;
-
-            if (character.Jumping)
-                character.Jumping.onJump += OnJump;
-        }
-
         void Update()
         {
-            bool player_paused = TheGame.Get().IsPausedByPlayer();
-            bool gameplay_paused = TheGame.Get().IsPausedByGameplay();
-            animator.enabled = !player_paused;
+            bool paused = TheGame.Get().IsPaused();
+            animator.enabled = !paused;
 
             if (animator.enabled)
             {
-                animator.SetBool(move_anim, !gameplay_paused && character.IsMoving());
-                animator.SetBool(craft_anim, !gameplay_paused && character.Crafting.IsCrafting());
+                animator.SetBool(move_anim, character.IsMoving());
                 animator.SetBool(sleep_anim, character.IsSleeping());
                 animator.SetBool(fish_anim, character.IsFishing());
-                animator.SetBool(ride_anim, character.IsRiding());
-                animator.SetBool(swim_anim, character.IsSwimming());
-                animator.SetBool(climb_anim, character.IsClimbing());
-
-                float mangle = Vector3.SignedAngle(character.GetFacing(), character.GetMove(), Vector3.up);
-                Vector3 move_side = new Vector3(Mathf.Sin(mangle * Mathf.Deg2Rad), 0f, Mathf.Cos(mangle * Mathf.Deg2Rad));
-                animator.SetFloat(move_side_x, move_side.x);
-                animator.SetFloat(move_side_z, move_side.z);
             }
         }
 
         private void OnTake(Item item)
         {
             animator.SetTrigger(take_anim);
-        }
-
-        private void OnDrop(Item item)
-        {
-            //Add drop anim here
-        }
-
-        private void OnCraft(CraftData cdata)
-        {
-            //Add craft anim here
         }
 
         private void OnBuild(Buildable construction)
@@ -120,19 +90,20 @@ namespace SurvivalEngine
         private void OnAttack(Destructible target, bool ranged)
         {
             string anim = attack_anim;
-            float anim_speed = character.Combat.GetAttackAnimSpeed();
 
             //Replace anim based on current equipped item
-            EquipItem equip = character.Inventory.GetEquippedWeaponMesh();
-            if (equip != null)
+            if (character_equip != null)
             {
-                if (!ranged && !string.IsNullOrEmpty(equip.attack_melee_anim))
-                    anim = equip.attack_melee_anim;
-                if (ranged && !string.IsNullOrEmpty(equip.attack_ranged_anim))
-                    anim = equip.attack_ranged_anim;
+                EquipItem equip = character_equip.GetEquippedItem(EquipSlot.Hand);
+                if (equip != null)
+                {
+                    if (!ranged && !string.IsNullOrEmpty(equip.attack_melee_anim))
+                        anim = equip.attack_melee_anim;
+                    if (ranged && !string.IsNullOrEmpty(equip.attack_ranged_anim))
+                        anim = equip.attack_ranged_anim;
+                }
             }
 
-            animator.SetFloat(attack_speed, anim_speed);
             animator.SetTrigger(anim);
         }
 
@@ -145,6 +116,11 @@ namespace SurvivalEngine
         {
             if(!string.IsNullOrEmpty(anim))
                 animator.SetTrigger(anim);
+        }
+
+        public static PlayerCharacterAnim Get()
+        {
+            return _instance;
         }
     }
 

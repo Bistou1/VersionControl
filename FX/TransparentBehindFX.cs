@@ -10,7 +10,6 @@ namespace SurvivalEngine
     
     public class TransparentBehindFX : MonoBehaviour
     {
-        public float opacity = 0.5f;
         public float distance = 5f;
         public float refresh_rate = 0.25f;
 
@@ -32,14 +31,10 @@ namespace SurvivalEngine
             {
                 foreach (Material material in render.sharedMaterials)
                 {
-                    bool valid_mat = material && MaterialTool.HasColor(material);
-                    Material material_normal = valid_mat ? new Material(material) : null;
-                    Material material_trans = valid_mat ? new Material(material) : null;
-                    if (material_trans != null && valid_mat)
-                    {
-                        material_trans.color = new Color(material_trans.color.r, material_trans.color.g, material_trans.color.b, material_trans.color.a * opacity);
-                        MaterialTool.ChangeRenderMode(material_trans, BlendMode.Fade);
-                    }
+                    Material material_normal = new Material(material);
+                    Material material_trans = new Material(material);
+                    material_trans.color = new Color(material_trans.color.r, material_trans.color.g, material_trans.color.b, material_trans.color.a * 0.5f);
+                    MaterialTool.ChangeRenderMode(material_trans, BlendMode.Fade);
                     materials.Add(material_normal);
                     materials_transparent.Add(material_trans);
                 }
@@ -87,7 +82,7 @@ namespace SurvivalEngine
                     {
                         Material mesh_mat = mesh_materials[i];
                         Material ref_mat = transparent ? materials_transparent[index] : materials[index];
-                        if (ref_mat != mesh_mat && ref_mat != null)
+                        if (ref_mat != mesh_mat)
                             mesh_materials[i] = ref_mat;
                     }
                     index++;

@@ -1,7 +1,10 @@
 ﻿using UnityEngine;
+using System.Collections;
 using UnityEditor;
+using System.Collections.Generic;
+using UnityEditor.SceneManagement;
 
-namespace SurvivalEngine.EditorTool
+namespace SurvivalEngine
 {
 
     /// <summary>
@@ -12,7 +15,7 @@ namespace SurvivalEngine.EditorTool
     {
 
         [MenuItem("Survival Engine/Align Objects", priority = 301)]
-        static void ScriptableWizardMenu()
+        static void SelectAllOfTagWizard()
         {
             ScriptableWizard.DisplayWizard<AlignObjects>("AlignObjects", "AlignObjects");
         }
@@ -29,11 +32,6 @@ namespace SurvivalEngine.EditorTool
         void OnWizardCreate()
         {
             DoAlignCubes();
-        }
-
-        void OnWizardUpdate()
-        {
-            helpString = "Use this tool to round the position of all selected objects (remove decimal).";
         }
     }
 

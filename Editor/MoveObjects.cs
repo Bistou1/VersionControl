@@ -2,8 +2,9 @@
 using System.Collections;
 using UnityEditor;
 
-namespace SurvivalEngine.EditorTool
+namespace SurvivalEngine
 {
+
     /// <summary>
     /// Move all selected objects at once by an exact value (instead of doing one by one, or instead of moving with the tool by an not-exact value)
     /// </summary>
@@ -14,7 +15,7 @@ namespace SurvivalEngine.EditorTool
         public Vector3 rotate;
 
         [MenuItem("Survival Engine/Transform Group", priority = 300)]
-        static void ScriptableWizardMenu()
+        static void SelectAllOfTagWizard()
         {
             ScriptableWizard.DisplayWizard<MoveObjects>("Transform Group", "Transform Group");
         }
@@ -32,11 +33,6 @@ namespace SurvivalEngine.EditorTool
             {
                 MoveObject(transform, move);
             }
-        }
-
-        void OnWizardUpdate()
-        {
-            helpString = "Use this tool to move all selected objects by an exact value.";
         }
     }
 

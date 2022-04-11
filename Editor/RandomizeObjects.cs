@@ -2,7 +2,7 @@
 using System.Collections;
 using UnityEditor;
 
-namespace SurvivalEngine.EditorTool
+namespace SurvivalEngine
 {
 
     /// <summary>
@@ -15,7 +15,7 @@ namespace SurvivalEngine.EditorTool
         public float noise_dist = 1f;
 
         [MenuItem("Survival Engine/Randomize Objects", priority = 302)]
-        static void ScriptableWizardMenu()
+        static void SelectAllOfTagWizard()
         {
             ScriptableWizard.DisplayWizard<RandomizeObjects>("Randomize Objects", "Randomize Objects");
         }
@@ -44,11 +44,6 @@ namespace SurvivalEngine.EditorTool
         void OnWizardCreate()
         {
             DoRandomize();
-        }
-
-        void OnWizardUpdate()
-        {
-            helpString = "Use this to add a random offset to the position of all selected objects.";
         }
     }
 

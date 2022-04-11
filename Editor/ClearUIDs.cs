@@ -4,7 +4,7 @@ using UnityEditor;
 using System.Collections.Generic;
 using UnityEditor.SceneManagement;
 
-namespace SurvivalEngine.EditorTool
+namespace SurvivalEngine
 {
 
     /// <summary>
@@ -16,7 +16,7 @@ namespace SurvivalEngine.EditorTool
     {
 
         [MenuItem("Survival Engine/Clear UIDs", priority = 201)]
-        static void ScriptableWizardMenu()
+        static void SelectAllOfTagWizard()
         {
             ScriptableWizard.DisplayWizard<ClearUIDs>("Clear Unique IDs", "Clear All UIDs");
         }
@@ -26,11 +26,6 @@ namespace SurvivalEngine.EditorTool
             UniqueID.ClearAll(GameObject.FindObjectsOfType<UniqueID>());
 
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
-        }
-
-        void OnWizardUpdate()
-        {
-            helpString = "Clear all UIDs in the scene. Warning: this will make previous save files incompatible.";
         }
     }
 

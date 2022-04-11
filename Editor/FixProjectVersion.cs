@@ -3,7 +3,7 @@ using System.Collections;
 using UnityEditor;
 using System.Collections.Generic;
 
-namespace SurvivalEngine.EditorTool
+namespace SurvivalEngine
 {
     /// <summary>
     /// Check if can apply any automatic fixes to issues that could be caused from changing asset version
@@ -12,7 +12,7 @@ namespace SurvivalEngine.EditorTool
     public class FixProjectVersion : ScriptableWizard
     {
         [MenuItem("Survival Engine/Fix Project Version", priority = 400)]
-        static void ScriptableWizardMenu()
+        static void SelectAllOfTagWizard()
         {
             ScriptableWizard.DisplayWizard<FixProjectVersion>("Fix Project Version", "Fix");
         }
@@ -42,7 +42,7 @@ namespace SurvivalEngine.EditorTool
                     }
 
                     //Add character to animals
-                    if (prefab.GetComponent<AnimalWild>() != null && prefab.GetComponent<Character>() == null)
+                    if (prefab.GetComponent<Animal>() != null && prefab.GetComponent<Character>() == null)
                     {
                         prefab.AddComponent<Character>();
                         EditorUtility.SetDirty(prefab);
@@ -55,92 +55,6 @@ namespace SurvivalEngine.EditorTool
                         prefab.AddComponent<Character>();
                         EditorUtility.SetDirty(prefab);
                         Debug.Log("Added Character Component to: " + prefab_path);
-                    }
-
-                    //Add PlayerCharacterCombat
-                    if (prefab.GetComponent<PlayerCharacter>() != null && prefab.GetComponent<PlayerCharacterCombat>() == null)
-                    {
-                        prefab.AddComponent<PlayerCharacterCombat>();
-                        EditorUtility.SetDirty(prefab);
-                        Debug.Log("Added PlayerCharacterCombat Component to: " + prefab_path);
-                    }
-
-                    //Add PlayerCharacterAttribute
-                    if (prefab.GetComponent<PlayerCharacter>() != null && prefab.GetComponent<PlayerCharacterAttribute>() == null)
-                    {
-                        prefab.AddComponent<PlayerCharacterAttribute>();
-                        EditorUtility.SetDirty(prefab);
-                        Debug.Log("Added PlayerCharacterAttribute Component to: " + prefab_path);
-                    }
-
-                    //Add PlayerCharacterAttribute
-                    if (prefab.GetComponent<PlayerCharacter>() != null && prefab.GetComponent<PlayerCharacterInventory>() == null)
-                    {
-                        prefab.AddComponent<PlayerCharacterInventory>();
-                        EditorUtility.SetDirty(prefab);
-                        Debug.Log("Added PlayerCharacterInventory Component to: " + prefab_path);
-                    }
-
-                    //Add PlayerCharacterCraft
-                    if (prefab.GetComponent<PlayerCharacter>() != null && prefab.GetComponent<PlayerCharacterCraft>() == null)
-                    {
-                        prefab.AddComponent<PlayerCharacterCraft>();
-                        EditorUtility.SetDirty(prefab);
-                        Debug.Log("Added PlayerCharacterCraft Component to: " + prefab_path);
-                    }
-
-                    //Remove Anywhere mode in Buildable
-                    Buildable buildable = prefab.GetComponent<Buildable>();
-                    if (buildable != null)
-                    {
-                        if ((int)buildable.type == 5) //Anywhere
-                        { 
-                            buildable.type = (BuildableType)0; //Default
-                            EditorUtility.SetDirty(prefab);
-                            Debug.Log("Changed buildable type to " + buildable.type + " on: " + prefab_path);
-                        }
-                        if ((int)buildable.type == 15) //AnywhereGrid
-                        { 
-                            buildable.type = (BuildableType)10; //Grid
-                            EditorUtility.SetDirty(prefab);
-                            Debug.Log("Changed buildable type to " + buildable.type + " on: " + prefab_path);
-                        }
-                    }
-
-                    //Add event trigger in UISlot
-                    GameObject ui_parent = null;
-                    ActionSelector actionselect = prefab.GetComponent<ActionSelector>();
-                    TheUI theui = prefab.GetComponent<TheUI>();
-                    if (actionselect != null)
-                        ui_parent = actionselect.gameObject;
-                    if (theui != null)
-                        ui_parent = theui.gameObject;
-                    if (ui_parent != null)
-                    {
-                        foreach (UISlot slot in ui_parent.GetComponentsInChildren<UISlot>())
-                        {
-                            if (slot.GetComponent<UnityEngine.UI.Button>() == null && slot.GetComponent<UnityEngine.EventSystems.EventTrigger>() == null)
-                            {
-                                slot.gameObject.AddComponent<UnityEngine.EventSystems.EventTrigger>();
-                                EditorUtility.SetDirty(prefab);
-                                Debug.Log("Added Event Trigger to " + slot.gameObject.name + " on: " + prefab_path);
-                            }
-                        }
-                    }
-
-                    //Add gameplay ui
-                    if (theui != null && theui.GetComponentInChildren<PlayerUI>() == null)
-                    {
-                        for (int i = 0; i < theui.transform.childCount; i++)
-                        {
-                            Transform child = theui.transform.GetChild(i);
-                            if (child.gameObject.name == "Gameplay")
-                            {
-                                child.gameObject.AddComponent<PlayerUI>();
-                                EditorUtility.SetDirty(prefab);
-                                Debug.Log("Added PlayerUI on: " + prefab_path);
-                            }
-                        }
                     }
                 }
             }
@@ -158,10 +72,6 @@ namespace SurvivalEngine.EditorTool
             }
             return result.ToArray();
         }
-
-        void OnWizardUpdate()
-        {
-            helpString = "Use this tool after updating Survival Engine version, to fix any prefabs that should be updated to match the new verison.";
-        }
     }
+
 }

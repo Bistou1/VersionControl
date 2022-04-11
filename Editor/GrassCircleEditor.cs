@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace SurvivalEngine.EditorTool
+namespace SurvivalEngine
 {
     /// <summary>
     /// Editor script for GrassCircle

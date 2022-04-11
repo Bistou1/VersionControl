@@ -18,6 +18,7 @@ namespace SurvivalEngine
         [HideInInspector]
         public Selectable target;
 
+
         private static ItemMergeFX _instance;
 
         void Awake()
@@ -44,18 +45,15 @@ namespace SurvivalEngine
             transform.position = target.transform.position;
             transform.rotation = Quaternion.LookRotation(TheCamera.Get().transform.forward, Vector3.up);
 
-            ItemSlot selected = ItemSlotPanel.GetSelectedSlotInAllPanels();
+            ItemSlot selected = TheUI.Get().GetSelectedItemSlot();
             if (selected != null && selected.GetItem() != null)
             {
                 MAction action = selected.GetItem().FindMergeAction(target);
-                foreach (PlayerCharacter player in PlayerCharacter.GetAll())
+                if (action != null)
                 {
-                    if (player != null && action != null && action.CanDoAction(player, selected, target))
-                    {
-                        icon.sprite = selected.GetItem().icon;
-                        title.text = action.title;
-                        icon_group.SetActive(true);
-                    }
+                    icon.sprite = selected.GetItem().icon;
+                    title.text = action.title;
+                    icon_group.SetActive(true);
                 }
             }
         }

@@ -25,8 +25,7 @@ namespace SurvivalEngine
 
         void Update()
         {
-            ItemSlotPanel chest_panel = ItemSlotPanel.Get(select.GetUID());
-            bool open = chest_panel != null && chest_panel.IsVisible();
+            bool open = StorageBar.Get().IsVisible() && StorageBar.Get().GetStorageUID() == select.GetUID();
             Quaternion target = open ? Quaternion.Euler(-90f, 0f, 0f) * start_rot : start_rot;
             chest_lid.localRotation = Quaternion.Slerp(chest_lid.localRotation, target, 10f * Time.deltaTime);
             if (chest_lid_outline != null)

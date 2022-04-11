@@ -5,8 +5,9 @@ using System.IO;
 using UnityEditor.SceneManagement;
 using System.Collections.Generic;
 
-namespace SurvivalEngine.EditorTool
+namespace SurvivalEngine
 {
+
     public enum CreateObjectType
     {
         None,
@@ -44,7 +45,7 @@ namespace SurvivalEngine.EditorTool
         public CreateObjectSettings settings;
 
         [MenuItem("Survival Engine/Create New Object", priority = 1)]
-        static void ScriptableWizardMenu()
+        static void SelectAllOfTagWizard()
         {
             ScriptableWizard.DisplayWizard<CreateObject>("CreateObject", "CreateObject");
         }
@@ -178,7 +179,7 @@ namespace SurvivalEngine.EditorTool
                     if (data.equip_slot == EquipSlot.Hand)
                     {
                         data.damage = 10;
-                        data.weapon_type = WeaponType.WeaponMelee;
+                        data.weapon = true;
                     }
                     else
                     {
@@ -371,11 +372,6 @@ namespace SurvivalEngine.EditorTool
         void OnWizardCreate()
         {
             DoCreateObject();
-        }
-
-        void OnWizardUpdate()
-        {
-            helpString = "Use this tool to create a new prefab and its data file.";
         }
     }
 

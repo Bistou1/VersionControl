@@ -22,37 +22,32 @@ namespace SurvivalEngine
         public UnityAction<Vector3> onRightClick; //Always triggered on right click
         public UnityAction<Vector3> onLongClick; //When holding the left click down for 1+ sec
         public UnityAction<Vector3> onHold; //While holding the left click down
-        public UnityAction<Vector3> onRelease; //Release mouse button
         public UnityAction<Vector3> onClickFloor; //When click on floor
         public UnityAction<Selectable, Vector3> onClickObject; //When click on object
 
+        private bool using_mouse = false;
         private float mouse_scroll = 0f;
         private Vector2 mouse_delta = Vector2.zero;
         private bool mouse_hold_left = false;
         private bool mouse_hold_right = false;
 
-        private float using_timer = 1f;
+        private float using_timer = 0f;
         private float hold_timer = 0f;
-        private float hold_total_timer = 0f;
         private bool is_holding = false;
-        private bool has_mouse = false;
         private bool can_long_click = false;
         private Vector3 hold_start;
         private Vector3 last_pos;
         private Vector3 floor_pos; //World position the floor pointing at
 
         private bool joystick_active = false;
-        private bool joystick_over_ui = false;
         private Vector3 joystick_pos;
         private Vector3 joystick_dir;
 
         private float zoom_value = 0f;
-        private float rotate_value = 0f;
         private bool is_zoom_mode = false;
-        private Vector3 prev_touch1 = Vector3.zero;
-        private Vector3 prev_touch2 = Vector3.zero;
+        private float prev_distance = 0f;
 
-        private HashSet<Selectable> raycast_list = new HashSet<Selectable>();
+        private HashSet<GameObject> raycast_list = new HashSet<GameObject>();
 
         private static PlayerControlsMouse _instance;
 
@@ -78,13 +73,7 @@ namespace SurvivalEngine
                 is_holding = true;
                 can_long_click = true;
                 hold_timer = 0f;
-                hold_total_timer = 0f;
                 OnMouseClick();
-            }
-
-            if (Input.GetMouseButtonUp(0))
-            {
-                OnMouseRelease();
             }
 
             if (Input.GetMouseButtonDown(1))
@@ -103,18 +92,19 @@ namespace SurvivalEngine
             float dist = diff.magnitude;
             if (dist > 0.01f)
             {
-                using_timer = 0f;
+                using_mouse = true;
+                using_timer = 1f;
                 last_pos = Input.mousePosition;
             }
 
             mouse_hold_left = Input.GetMouseButton(0) && !IsMouseOverUI();
             mouse_hold_right = Input.GetMouseButton(1) && !IsMouseOverUI();
             if (mouse_hold_left || mouse_hold_right)
-                using_timer = 0f;
+                using_timer = 1f;
 
             //Is using mouse? (vs keyboard)
-            using_timer += Time.deltaTime;
-            has_mouse = has_mouse || IsUsingMouse();
+            using_timer -= Time.deltaTime;
+            using_mouse = using_timer > 0f;
 
             //Long mouse click
             float dist_hold = (Input.mousePosition - hold_start).magnitude;
@@ -124,7 +114,6 @@ namespace SurvivalEngine
             if (is_holding)
             {
                 hold_timer += Time.deltaTime;
-                hold_total_timer += Time.deltaTime;
                 if (can_long_click && hold_timer > 0.5f)
                 {
                     can_long_click = false;
@@ -145,7 +134,6 @@ namespace SurvivalEngine
                     joystick_pos = Input.mousePosition;
                     joystick_dir = Vector2.zero;
                     joystick_active = false;
-                    joystick_over_ui = IsMouseOverUI();
                 }
 
                 if (!Input.GetMouseButton(0))
@@ -154,7 +142,7 @@ namespace SurvivalEngine
                     joystick_dir = Vector2.zero;
                 }
 
-                if (Input.GetMouseButton(0) && !joystick_over_ui)
+                if (Input.GetMouseButton(0))
                 {
                     Vector3 distance = Input.mousePosition - joystick_pos;
                     distance.z = 0f;
@@ -169,24 +157,16 @@ namespace SurvivalEngine
                 }
 
                 zoom_value = 0f;
-                rotate_value = 0f;
                 if (Input.touchCount == 2)
                 {
-                    Vector2 pos1 = Input.GetTouch(0).position;
-                    Vector2 pos2 = Input.GetTouch(1).position;
+                    Vector3 pos1 = Input.GetTouch(0).position;
+                    Vector3 pos2 = Input.GetTouch(1).position;
+                    float distance = Vector2.Distance(pos1, pos2);
                     if (is_zoom_mode)
                     {
-                        float distance = Vector2.Distance(pos1, pos2);
-                        float prev_distance = Vector2.Distance(prev_touch1, prev_touch2);
                         zoom_value = (distance - prev_distance) / (float)Screen.height;
-
-                        var pDir = prev_touch2 - prev_touch1;
-                        var cDir = pos2 - pos1;
-                        rotate_value = Vector2.SignedAngle(pDir, cDir);
-                        rotate_value = Mathf.Clamp(rotate_value, -45f, 45f);
                     }
-                    prev_touch1 = pos1;
-                    prev_touch2 = pos2;
+                    prev_distance = distance;
                     is_zoom_mode = true; //Wait one frame to make sure distance has been calculated once
                     joystick_active = false; //No joystick while zooming
                 }
@@ -200,14 +180,6 @@ namespace SurvivalEngine
         public void RaycastSelectables()
         {
             raycast_list.Clear();
-
-            if (TheUI.Get().IsBlockingPanelOpened())
-                return;
-
-            PlayerUI ui = PlayerUI.GetFirst();
-            if (ui != null && ui.IsBuildMode())
-                return; //Dont hover/select things in build mode
-
             RaycastHit[] hits = Physics.RaycastAll(GetMouseCameraRay(), 99f, selectable_layer.value);
             foreach (RaycastHit hit in hits)
             {
@@ -215,7 +187,7 @@ namespace SurvivalEngine
                 {
                     Selectable select = hit.collider.GetComponentInParent<Selectable>();
                     if (select != null)
-                        raycast_list.Add(select);
+                        raycast_list.Add(select.gameObject);
                 }
             }
         }
@@ -224,7 +196,7 @@ namespace SurvivalEngine
         {
             Ray ray = GetMouseCameraRay();
             RaycastHit hit;
-            bool success = Physics.Raycast(ray, out hit, 100f, floor_layer.value, QueryTriggerInteraction.Ignore);
+            bool success = Physics.Raycast(ray, out hit, 100f, floor_layer.value);
             if (success)
             {
                 floor_pos = ray.GetPoint(hit.distance);
@@ -260,6 +232,9 @@ namespace SurvivalEngine
 
             MobileCheckRaycast();
 
+            if (CraftBar.Get())
+                CraftBar.Get().CancelSubSelection();
+
             Selectable hovered = GetNearestRaycastList(floor_pos);
             if (hovered != null)
             {
@@ -275,17 +250,6 @@ namespace SurvivalEngine
                 if (onClickFloor != null)
                     onClickFloor.Invoke(floor_pos);
             }
-        }
-
-        private void OnMouseRelease()
-        {
-            if (IsMouseOverUI())
-                return;
-
-            MobileCheckRaycast();
-
-            if (onRelease != null)
-                onRelease.Invoke(floor_pos);
         }
 
         private void OnRightMouseClick()
@@ -326,9 +290,10 @@ namespace SurvivalEngine
         {
             Selectable nearest = null;
             float min_dist = 99f;
-            foreach (Selectable select in raycast_list)
+            foreach (GameObject obj in raycast_list)
             {
-                if (select != null && select.CanBeClicked())
+                Selectable select = obj.GetComponent<Selectable>();
+                if (select != null && select.IsActive())
                 {
                     float dist = (select.transform.position - pos).magnitude;
                     if (dist < min_dist)
@@ -339,6 +304,20 @@ namespace SurvivalEngine
                 }
             }
             return nearest;
+        }
+
+        public int GetInventorySelectedSlotIndex()
+        {
+            if (InventoryBar.Get())
+                return InventoryBar.Get().GetSelectedSlotIndex();
+            return -1;
+        }
+
+        public int GetEquippedSelectedSlotIndex()
+        {
+            if (EquipBar.Get())
+                return EquipBar.Get().GetSelectedSlotIndex();
+            return -1;
         }
 
         public Vector2 GetScreenPos()
@@ -353,31 +332,14 @@ namespace SurvivalEngine
             return floor_pos;
         }
 
-        public bool IsInRaycast(Selectable select)
+        public bool IsInRaycast(GameObject obj)
         {
-            return raycast_list.Contains(select);
+            return raycast_list.Contains(obj);
         }
 
-        //Is there a mouse/touch enabled on this device? (would be false on consoles)
-        public bool HasMouse()
-        {
-            return has_mouse;
-        }
-
-        //Is the user curently using the mouse?
         public bool IsUsingMouse()
         {
-            return IsMovingMouse(1f); //Using mouse if moved it in the last second
-        }
-
-        public bool IsMovingMouse(float offset = 0.1f)
-        {
-            return GetTimeSinceLastMouseMove() <= offset;
-        }
-
-        public float GetTimeSinceLastMouseMove()
-        {
-            return using_timer;
+            return using_mouse;
         }
 
         public bool IsMouseHold()
@@ -388,11 +350,6 @@ namespace SurvivalEngine
         public bool IsMouseHoldRight()
         {
             return mouse_hold_right;
-        }
-
-        public float GetMouseHoldDuration()
-        {
-            return hold_total_timer;
         }
 
         public float GetMouseScroll()
@@ -408,16 +365,6 @@ namespace SurvivalEngine
         public float GetTouchZoom()
         {
             return zoom_value;
-        }
-
-        public float GetTouchRotate()
-        {
-            return rotate_value;
-        }
-
-        public bool IsDoubleTouch()
-        {
-            return Input.touchCount >= 2;
         }
 
         public bool IsJoystickActive()
@@ -450,13 +397,6 @@ namespace SurvivalEngine
         private Ray GetMouseCameraRay()
         {
             return TheCamera.GetCamera().ScreenPointToRay(GetClampMousePos());
-        }
-
-        //Get world position of the mouse
-        public Vector3 GetMouseWorldPosition()
-        {
-            Vector3 mouse = new Vector3(Input.mousePosition.x, Input.mousePosition.y, 10f);
-            return TheCamera.GetCamera().ScreenToWorldPoint(mouse);
         }
 
         //Check if mouse is on top of any UI element

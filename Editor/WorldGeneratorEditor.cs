@@ -4,7 +4,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
-namespace SurvivalEngine.WorldGen.EditorTool
+namespace SurvivalEngine.WorldGen
 {
 
     /// <summary>

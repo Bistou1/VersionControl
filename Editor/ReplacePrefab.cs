@@ -3,7 +3,7 @@ using System.Collections;
 using UnityEditor;
 using System.Collections.Generic;
 
-namespace SurvivalEngine.EditorTool
+namespace SurvivalEngine
 {
 
     /// <summary>
@@ -15,7 +15,7 @@ namespace SurvivalEngine.EditorTool
         public GameObject NewPrefab;
 
         [MenuItem("Survival Engine/Replace Prefab", priority = 304)]
-        static void ScriptableWizardMenu()
+        static void SelectAllOfTagWizard()
         {
             ScriptableWizard.DisplayWizard<ReplacePrefab>("Replace Prefabs", "Replace Prefabs");
         }
@@ -42,11 +42,6 @@ namespace SurvivalEngine.EditorTool
 
                 Selection.objects = newObjs.ToArray();
             }
-        }
-
-        void OnWizardUpdate()
-        {
-            helpString = "Use this tool to replace all selected objects in the scene by a prefab.";
         }
     }
 

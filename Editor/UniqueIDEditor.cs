@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace SurvivalEngine.EditorTool
+namespace SurvivalEngine
 {
 
     /// <summary>
@@ -31,7 +31,7 @@ namespace SurvivalEngine.EditorTool
             if (GUILayout.Button("Generate UID"))
             {
                 Undo.RecordObject(myScript, "Generate UID");
-                myScript.GenerateUIDEditor();
+                myScript.GenerateUID();
                 EditorUtility.SetDirty(myScript);
             }
 

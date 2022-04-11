@@ -5,8 +5,9 @@ using System.IO;
 using UnityEditor.SceneManagement;
 using System.Collections.Generic;
 
-namespace SurvivalEngine.EditorTool
+namespace SurvivalEngine
 {
+
     /// <summary>
     /// Use this tool to easily dupplicate a CraftData object and all links
     /// </summary>
@@ -20,7 +21,7 @@ namespace SurvivalEngine.EditorTool
         private Dictionary<int, string> copied_prefabs = new Dictionary<int, string>();
 
         [MenuItem("Survival Engine/Duplicate Object", priority = 2)]
-        static void ScriptableWizardMenu()
+        static void SelectAllOfTagWizard()
         {
             ScriptableWizard.DisplayWizard<DuplicateObject>("DuplicateObject", "DuplicateObject");
         }
@@ -217,11 +218,6 @@ namespace SurvivalEngine.EditorTool
         void OnWizardCreate()
         {
             DoDuplicateObject();
-        }
-
-        void OnWizardUpdate()
-        {
-            helpString = "Use this tool to duplicate a prefab and its data file.";
         }
     }
 

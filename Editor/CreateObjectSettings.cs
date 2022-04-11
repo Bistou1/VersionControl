@@ -1,13 +1,14 @@
 ﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
-namespace SurvivalEngine.EditorTool
+namespace SurvivalEngine
 {
     /// <summary>
     /// Default Settings file for the CreatObject editor script
     /// </summary>
     
-    [CreateAssetMenu(fileName = "CreateObjectSettings", menuName = "SurvivalEngine/CreateObjectSettings", order = 100)]
+    [CreateAssetMenu(fileName = "CreateObjectSettings", menuName = "Data/CreateObjectSettings", order = 100)]
     public class CreateObjectSettings : ScriptableObject
     {
 
