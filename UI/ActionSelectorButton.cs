@@ -10,28 +10,22 @@ namespace SurvivalEngine
     /// One of the buttons on the ActionSelector
     /// </summary>
 
-    public class ActionSelectorButton : UISlot
+    public class ActionSelectorButton : MonoBehaviour
     {
-        [Header("Selector Button")]
         public Text title;
-        public Image highlight;
+
+        public UnityAction<SAction> onClick;
 
         private SAction action;
 
-        protected override void Awake()
+        void Awake()
         {
-            base.Awake();
-
-            if (highlight != null)
-                highlight.enabled = false;
+            GetComponent<Button>().onClick.AddListener(OnClick);
         }
 
-        protected override void Update()
+        void Update()
         {
-            base.Update();
 
-            if (highlight != null)
-                highlight.enabled = key_hover;
         }
 
         public void SetButton(SAction action)
@@ -41,11 +35,21 @@ namespace SurvivalEngine
             gameObject.SetActive(true);
         }
 
+        public void Hide()
+        {
+            gameObject.SetActive(false);
+        }
+
         public SAction GetAction()
         {
             return action;
         }
 
+        public void OnClick()
+        {
+            if (onClick != null)
+                onClick.Invoke(action);
+        }
     }
 
 }

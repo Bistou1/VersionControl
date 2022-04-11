@@ -30,7 +30,7 @@ namespace SurvivalEngine
         {
             PlayerControlsMouse controls = PlayerControlsMouse.Get();
 
-            float target_alpha = controls.IsJoystickActive() && !PlayerUI.GetFirst().IsBuildMode() ? 1f : 0f;
+            float target_alpha = controls.IsJoystickActive() ? 1f : 0f;
             canvas.alpha = Mathf.MoveTowards(canvas.alpha, target_alpha, 4f * Time.deltaTime);
 
             Vector2 screenPos = controls.GetJoystickPos();

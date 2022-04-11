@@ -13,7 +13,7 @@ namespace SurvivalEngine
     [RequireComponent(typeof(Buildable))]
     [RequireComponent(typeof(UniqueID))]
     [RequireComponent(typeof(Destructible))]
-    public class Plant : Craftable
+    public class Plant : MonoBehaviour
     {
         [Header("Plant")]
         public PlantData data;
@@ -54,24 +54,22 @@ namespace SurvivalEngine
 
         private static List<Plant> plant_list = new List<Plant>();
 
-        protected override void Awake()
+        void Awake()
         {
-            base.Awake();
             plant_list.Add(this);
             selectable = GetComponent<Selectable>();
             buildable = GetComponent<Buildable>();
             destruct = GetComponent<Destructible>();
             unique_id = GetComponent<UniqueID>();
             selectable.onDestroy += OnDeath;
-            buildable.onBuild += OnBuild;
+            buildable.onBuild += OnFinishBuild;
 
             if(data != null)
                 nb_stages = Mathf.Max(data.growth_stage_prefabs.Length, 1);
         }
 
-        protected override void OnDestroy()
+        void OnDestroy()
         {
-            base.OnDestroy();
             plant_list.Remove(this);
         }
 
@@ -87,15 +85,8 @@ namespace SurvivalEngine
                 fruit_model.gameObject.SetActive(false);
 
             //Fruit
-            if (PlayerData.Get().HasCustomInt(GetSubUID("fruit")))
-                has_fruit = PlayerData.Get().GetCustomInt(GetSubUID("fruit")) > 0;
-
-            //Progress
-            if (PlayerData.Get().HasCustomFloat(GetSubUID("progress")))
-            {
-                growth_progress = PlayerData.Get().GetCustomFloat(GetSubUID("progress"));
-                fruit_progress = PlayerData.Get().GetCustomFloat(GetSubUID("progress"));
-            }
+            if (PlayerData.Get().HasUniqueID(GetFruitUID()))
+                has_fruit = PlayerData.Get().GetUniqueID(GetFruitUID()) > 0;
         }
 
         void Update()
@@ -103,18 +94,14 @@ namespace SurvivalEngine
             if (TheGame.Get().IsPaused())
                 return;
 
-            if (buildable.IsBuilding())
-                return;
-
             float game_speed = TheGame.Get().GetGameTimeSpeedPerSec();
 
             if (!IsFullyGrown() && grow_time > 0.001f)
             {
                 growth_progress += game_speed * boost_mult * Time.deltaTime;
-                PlayerData.Get().SetCustomFloat(GetSubUID("progress"), growth_progress);
-
                 if (growth_progress > grow_time)
                 {
+                    growth_progress = 0f;
                     GrowPlant();
                     return;
                 }
@@ -123,12 +110,12 @@ namespace SurvivalEngine
             if (!has_fruit && fruit != null)
             {
                 fruit_progress += game_speed * boost_mult * Time.deltaTime;
-                PlayerData.Get().SetCustomFloat(GetSubUID("progress"), fruit_progress);
 
                 if (fruit_progress > fruit_grow_time)
                 {
-                    GrowFruit();
-                    return;
+                    has_fruit = true;
+                    fruit_progress = 0f;
+                    PlayerData.Get().SetUniqueID(GetFruitUID(), 1);
                 }
             }
 
@@ -139,10 +126,6 @@ namespace SurvivalEngine
                 if (boost_timer <= 0.01f)
                     boost_mult = 1f;
             }
-
-            //Water 
-            if (!HasWater() && TheGame.Get().IsWeather(WeatherEffect.Rain))
-                Water();
 
             //Display
             if (fruit_model != null && has_fruit != fruit_model.gameObject.activeSelf)
@@ -176,24 +159,12 @@ namespace SurvivalEngine
                     PlayerData.Get().GrowPlant(GetUID(), grow_stage);
                 }
 
-                growth_progress = 0f;
-                PlayerData.Get().SetCustomFloat(GetSubUID("progress"), 0f);
-                plant_list.Remove(this); //Remove from list so spawn works!
-
-                Spawn(sdata.uid);
+                Plant plant = Spawn(sdata.uid);
                 Destroy(gameObject);
             }
         }
 
-        public void GrowFruit()
-        {
-            has_fruit = true;
-            fruit_progress = 0f;
-            PlayerData.Get().SetCustomInt(GetSubUID("fruit"), 1);
-            PlayerData.Get().SetCustomFloat(GetSubUID("progress"), 0f);
-        }
-
-        public void Water()
+        public void AddWater(PlayerCharacter character)
         {
             boost_mult = (1f + water_grow_boost);
             boost_timer = water_duration;
@@ -201,10 +172,10 @@ namespace SurvivalEngine
 
         public void Harvest(PlayerCharacter character)
         {
-            if (fruit != null && has_fruit && character.Inventory.CanTakeItem(fruit, 1))
+            if (fruit != null && has_fruit && PlayerData.Get().CanTakeItem(fruit.id, 1))
             {
                 GameObject source = fruit_model != null ? fruit_model.gameObject : gameObject;
-                character.Inventory.GainItem(fruit, 1, source.transform.position);
+                character.GainItem(fruit, 1, source.transform.position);
 
                 RemoveFruit();
 
@@ -221,20 +192,10 @@ namespace SurvivalEngine
         public void RemoveFruit()
         {
             has_fruit = false;
-            PlayerData.Get().SetCustomInt(GetSubUID("fruit"), 0);
+            PlayerData.Get().SetUniqueID(GetFruitUID(), 0);
         }
 
-        public void Kill()
-        {
-            destruct.Kill();
-        }
-
-        public void KillNoLoot()
-        {
-            destruct.KillNoLoot(); //Such as when being eaten, dont spawn loot
-        }
-
-        private void OnBuild()
+        public void OnFinishBuild()
         {
             if (data != null)
             {
@@ -243,24 +204,20 @@ namespace SurvivalEngine
             }
         }
 
+        public void Kill()
+        {
+            destruct.Kill();
+        }
+
         private void OnDeath()
         {
-            if (data != null)
-            {
-                foreach (PlayerCharacter character in PlayerCharacter.GetAll())
-                    character.Data.AddKillCount(data.id); //Add kill count
-            }
-
             PlayerData.Get().RemovePlant(GetUID());
-            if (!was_spawned)
-                PlayerData.Get().RemoveObject(GetUID());
 
             if (HasFruit())
-                Item.Create(fruit, transform.position, 1);
+                Item.Create(fruit, transform.position, 1, fruit.durability);
 
             if (data != null && regrow_on_death)
             {
-                SowedPlantData sdata = PlayerData.Get().GetSowedPlant(GetUID());
                 Create(data, transform.position, transform.rotation, 0);
             }
         }
@@ -280,16 +237,13 @@ namespace SurvivalEngine
             return (growth_stage + 1) >= nb_stages;
         }
 
-        public bool IsBuilt()
+        public string GetFruitUID()
         {
-            return !IsDead() && !buildable.IsBuilding();
+            if (!string.IsNullOrEmpty(unique_id.unique_id))
+                return unique_id.unique_id + "_fruit";
+            return "";
         }
 
-        public bool IsDead()
-        {
-            return destruct.IsDead();
-        }
-        
         public bool HasUID()
         {
             return !string.IsNullOrEmpty(unique_id.unique_id);
@@ -298,18 +252,6 @@ namespace SurvivalEngine
         public string GetUID()
         {
             return unique_id.unique_id;
-        }
-
-        public string GetSubUID(string tag)
-        {
-            return unique_id.GetSubUID(tag);
-        }
-
-        public bool HasGroup(GroupData group)
-        {
-            if (data != null)
-                return data.HasGroup(group) || selectable.HasGroup(group);
-            return selectable.HasGroup(group);
         }
 
         public Selectable GetSelectable()
@@ -327,52 +269,20 @@ namespace SurvivalEngine
             return buildable;
         }
 
-        public SowedPlantData SaveData
-        {
-            get { return PlayerData.Get().GetSowedPlant(GetUID()); }  //Can be null if not sowed or spawned
-        }
-
-        public static new Plant GetNearest(Vector3 pos, float range = 999f)
+        public static Plant GetNearest(Vector3 pos, float range = 999f)
         {
             Plant nearest = null;
             float min_dist = range;
             foreach (Plant plant in plant_list)
             {
                 float dist = (plant.transform.position - pos).magnitude;
-                if (dist < min_dist && plant.IsBuilt())
+                if (dist < min_dist)
                 {
                     min_dist = dist;
                     nearest = plant;
                 }
             }
             return nearest;
-        }
-
-        public static int CountInRange(Vector3 pos, float range)
-        {
-            int count = 0;
-            foreach (Plant plant in GetAll())
-            {
-                float dist = (plant.transform.position - pos).magnitude;
-                if (dist < range && plant.IsBuilt())
-                    count++;
-            }
-            return count;
-        }
-
-        public static int CountInRange(PlantData data, Vector3 pos, float range)
-        {
-            int count = 0;
-            foreach (Plant plant in GetAll())
-            {
-                if (plant.data == data && plant.IsBuilt())
-                {
-                    float dist = (plant.transform.position - pos).magnitude;
-                    if (dist < range)
-                        count++;
-                }
-            }
-            return count;
         }
 
         public static Plant GetByUID(string uid)
@@ -388,18 +298,7 @@ namespace SurvivalEngine
             return null;
         }
 
-        public static List<Plant> GetAllOf(PlantData data)
-        {
-            List<Plant> valid_list = new List<Plant>();
-            foreach (Plant plant in plant_list)
-            {
-                if (plant.data == data)
-                    valid_list.Add(plant);
-            }
-            return valid_list;
-        }
-
-        public static new List<Plant> GetAll()
+        public static List<Plant> GetAll()
         {
             return plant_list;
         }
@@ -408,7 +307,7 @@ namespace SurvivalEngine
         public static Plant Spawn(string uid, Transform parent = null)
         {
             SowedPlantData sdata = PlayerData.Get().GetSowedPlant(uid);
-            if (sdata != null && sdata.scene == SceneNav.GetCurrentScene())
+            if (sdata != null)
             {
                 PlantData pdata = PlantData.Get(sdata.plant_id);
                 if (pdata != null)
@@ -428,18 +327,15 @@ namespace SurvivalEngine
             return null;
         }
 
-        //Create a totally new one, in build mode for player to place, will be saved after FinishBuild() is called, -1 = max stage
+        //Create a totally new one, in build mode for player to place, will be saved after FinishBuild() is called
         public static Plant CreateBuildMode(PlantData data, Vector3 pos, int stage)
         {
             GameObject prefab = data.GetStagePrefab(stage);
             GameObject build = Instantiate(prefab, pos, prefab.transform.rotation);
             Plant plant = build.GetComponent<Plant>();
             plant.data = data;
+            plant.growth_stage = stage;
             plant.was_spawned = true;
-
-            if(stage >= 0 && stage < data.growth_stage_prefabs.Length)
-                plant.growth_stage = stage;
-            
             return plant;
         }
 
@@ -451,6 +347,7 @@ namespace SurvivalEngine
             return plant;
         }
 
+        //Create a totally new one that will be added to save file, already placed
         public static Plant Create(PlantData data, Vector3 pos, Quaternion rot, int stage)
         {
             Plant plant = CreateBuildMode(data, pos, stage);

@@ -26,42 +26,32 @@ namespace SurvivalEngine
         private Construction construction;
         private Buildable buildable;
         private UniqueID unique_id;
-        private HeatSource heat_source;
 
         private bool is_on = false;
         private float fuel = 0f;
 
-        private static List<Firepit> firepit_list = new List<Firepit>();
-
         void Awake()
         {
-            firepit_list.Add(this);
             select = GetComponent<Selectable>();
             construction = GetComponent<Construction>();
             buildable = GetComponent<Buildable>();
             unique_id = GetComponent<UniqueID>();
-            heat_source = GetComponent<HeatSource>();
             if (fire_fx)
                 fire_fx.SetActive(false);
             if (fuel_model)
                 fuel_model.SetActive(false);
         }
 
-        private void OnDestroy()
-        {
-            firepit_list.Remove(this);
-        }
-
         private void Start()
         {
             //select.onUse += OnUse;
             select.RemoveGroup(fire_group);
-            buildable.onBuild += OnBuild;
+            buildable.onBuild += OnFinishBuild;
 
             if (!construction.was_spawned && !buildable.IsBuilding())
                 fuel = start_fuel;
-            if (PlayerData.Get().HasCustomFloat(GetFireUID()))
-                fuel = PlayerData.Get().GetCustomFloat(GetFireUID());
+            if (PlayerData.Get().HasUniqueID(GetFireUID()))
+                fuel = PlayerData.Get().GetUniqueID(GetFireUID());
         }
 
         void Update()
@@ -74,7 +64,7 @@ namespace SurvivalEngine
                 float game_speed = TheGame.Get().GetGameTimeSpeedPerSec();
                 fuel -= game_speed * Time.deltaTime;
 
-                PlayerData.Get().SetCustomFloat(GetFireUID(), fuel);
+                PlayerData.Get().SetUniqueID(GetFireUID(), Mathf.RoundToInt(fuel));
             }
 
             is_on = fuel > 0f;
@@ -87,9 +77,6 @@ namespace SurvivalEngine
                 select.AddGroup(fire_group);
             else
                 select.RemoveGroup(fire_group);
-
-            if (heat_source != null)
-                heat_source.enabled = is_on;
         }
 
         public void AddFuel(float value)
@@ -97,10 +84,10 @@ namespace SurvivalEngine
             fuel += value;
             is_on = fuel > 0f;
 
-            PlayerData.Get().SetCustomFloat(GetFireUID(), fuel);
+            PlayerData.Get().SetUniqueID(GetFireUID(), Mathf.RoundToInt(fuel));
         }
 
-        private void OnBuild()
+        private void OnFinishBuild()
         {
             fuel = start_fuel;
         }
@@ -115,27 +102,6 @@ namespace SurvivalEngine
         public bool IsOn()
         {
             return is_on;
-        }
-
-        public static Firepit GetNearest(Vector3 pos, float range=999f)
-        {
-            float min_dist = range;
-            Firepit nearest = null;
-            foreach (Firepit fire in firepit_list)
-            {
-                float dist = (pos - fire.transform.position).magnitude;
-                if (dist < min_dist)
-                {
-                    min_dist = dist;
-                    nearest = fire;
-                }
-            }
-            return nearest;
-        }
-
-        public static List<Firepit> GetAll()
-        {
-            return firepit_list;
         }
     }
 

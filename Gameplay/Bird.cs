@@ -30,7 +30,7 @@ namespace SurvivalEngine
         public float detect_range = 5f;
         public float detect_angle = 360f;
         public float detect_360_range = 1f;
-        public float reaction_time = 0.2f;
+        public float alerted_duration = 0.5f;
 
         [Header("Models")]
         public Animator sit_model;
@@ -43,7 +43,6 @@ namespace SurvivalEngine
         private float state_timer = 0f;
         private Vector3 start_pos;
         private Vector3 target_pos;
-        private float update_timer = 0f;
 
         private void Awake()
         {
@@ -54,14 +53,8 @@ namespace SurvivalEngine
             target_pos = transform.position;
             destruct.onDeath += OnDeath;
             state_timer = 99f; //Fly right away
-            update_timer = Random.Range(-1f, 1f);
 
             transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
-        }
-
-        private void Start()
-        {
-            StopFly();
         }
 
         void Update()
@@ -73,6 +66,8 @@ namespace SurvivalEngine
 
             if (state == BirdState.Sit)
             {
+                DetectThreat();
+
                 if (state_timer > sit_duration)
                 {
                     FlyAway();
@@ -81,7 +76,7 @@ namespace SurvivalEngine
 
             if (state == BirdState.Alerted)
             {
-                if (state_timer > reaction_time)
+                if (state_timer > alerted_duration)
                 {
                     FlyAway();
                 }
@@ -104,21 +99,6 @@ namespace SurvivalEngine
                 {
                     Land();
                 }
-            }
-
-            update_timer += Time.deltaTime;
-            if (update_timer > 0.5f)
-            {
-                update_timer = Random.Range(-0.02f, 0.02f);
-                SlowUpdate(); //Optimization
-            }
-        }
-
-        private void SlowUpdate()
-        {
-            if (state == BirdState.Sit)
-            {
-                DetectThreat();
             }
         }
 
@@ -147,9 +127,6 @@ namespace SurvivalEngine
                 fly_model.gameObject.SetActive(true);
                 sit_model.gameObject.SetActive(false);
                 character.MoveTo(target_pos);
-
-                foreach (Collider collide in colliders)
-                    collide.enabled = false;
             }
         }
 
@@ -176,64 +153,37 @@ namespace SurvivalEngine
 
         private bool FindFlyPosition(Vector3 pos, float radius, out Vector3 fly_pos)
         {
-            Vector3 offest = new Vector3(Random.Range(-radius, radius), 0f, Random.Range(radius, radius));
+            Vector3 offest = new Vector3(Random.Range(-radius, radius), 20f, Random.Range(radius, radius));
             fly_pos = pos + offest;
-            fly_pos.y = start_pos.y + 20f;
             return true;
         }
 
         //Find landing position to make sure it wont land on an obstacle
         private bool FindGroundPosition(Vector3 pos, float radius, out Vector3 ground_pos)
         {
-            Vector3 offest = new Vector3(Random.Range(-radius, radius), 0f, Random.Range(radius, radius));
+            Vector3 offest = new Vector3(Random.Range(-radius, radius), 20f, Random.Range(radius, radius));
             Vector3 center = pos + offest;
-            bool found = PhysicsTool.FindGroundPosition(center, 50f, character.ground_layer.value, out ground_pos);
-            return found;
+            RaycastHit h1;
+            bool f1 = Physics.Raycast(center, Vector3.down, out h1, 50f, ~0, QueryTriggerInteraction.Ignore);
+            bool is_in_layer = h1.collider != null && ((1 << h1.collider.gameObject.layer) & character.ground_layer.value) > 0;
+            ground_pos = h1.point;
+            return f1 && is_in_layer;
         }
 
         //Detect if the player is in vision
         private void DetectThreat()
         {
-            Vector3 pos = transform.position;
-
-            //React to player
-            foreach (PlayerCharacter player in PlayerCharacter.GetAll())
+            PlayerCharacter character = PlayerCharacter.Get();
+            Vector3 char_dir = (character.transform.position - transform.position);
+            if (char_dir.magnitude < detect_range)
             {
-                Vector3 char_dir = (player.transform.position - pos);
-                if (char_dir.magnitude < detect_range)
+                float dangle = detect_angle / 2f; // /2 for each side
+                float angle = Vector3.Angle(transform.forward, char_dir.normalized);
+                if (angle < dangle || char_dir.magnitude < detect_360_range)
                 {
-                    float dangle = detect_angle / 2f; // /2 for each side
-                    float angle = Vector3.Angle(transform.forward, char_dir.normalized);
-                    if (angle < dangle || char_dir.magnitude < detect_360_range)
-                    {
-                        state = BirdState.Alerted;
-                        state_timer = 0f;
-                        StopMoving();
-                        return;
-                    }
-                }
-            }
-
-            //React to other characters
-            foreach (Selectable selectable in Selectable.GetAllActive())
-            {
-                if (selectable.gameObject != gameObject)
-                {
-                    Vector3 dir = (selectable.transform.position - pos);
-                    if (dir.magnitude < detect_range)
-                    {
-                        Character character = selectable.GetCharacter();
-                        if (character && character.attack_enabled) //Only afraid if the character can attack
-                        {
-                            if (character.GetDestructible().team_group != this.destruct.team_group)
-                            {
-                                state = BirdState.Alerted;
-                                state_timer = 0f;
-                                StopMoving();
-                                return;
-                            }
-                        }
-                    }
+                    state = BirdState.Alerted;
+                    state_timer = 0f;
+                    StopMoving();
                 }
             }
         }

@@ -9,65 +9,45 @@ namespace SurvivalEngine
     /// ActionSelectorUI is similar to ActionSelector, but for items in the player's inventory in the UI Canvas.
     /// </summary>
 
-    public class ActionSelectorUI : UISlotPanel
+    public class ActionSelectorUI : MonoBehaviour
     {
-        private Animator animator;
+        public ActionSelectorButton[] buttons;
 
-        private PlayerUI parent_ui;
+        private Animator animator;
+        private bool visible = false;
+
+        private PlayerCharacter character;
         private ItemSlot slot;
 
-        private UISlotPanel prev_panel = null;
+        private static ActionSelectorUI _instance;
 
-        private static List<ActionSelectorUI> selector_list = new List<ActionSelectorUI>();
-
-        protected override void Awake()
+        void Awake()
         {
-            base.Awake();
-
-            selector_list.Add(this);
+            _instance = this;
             animator = GetComponent<Animator>();
-            parent_ui = GetComponentInParent<PlayerUI>();
             gameObject.SetActive(false);
 
-        }
-
-        protected override void OnDestroy()
-        {
-            base.OnDestroy();
-            selector_list.Remove(this);
-        }
-
-        protected override void Start()
-        {
-            base.Start();
-
-            //PlayerControlsMouse.Get().onClick += OnMouseClick;
-            PlayerControlsMouse.Get().onRightClick += OnMouseClick;
-
-            onClickSlot += OnClick;
-            onPressAccept += OnAccept;
-            onPressCancel += OnCancel;
-            onPressUse += OnCancel;
-        }
-
-        protected override void Update()
-        {
-            base.Update();
-
-            //Auto focus
-            UISlotPanel focus_panel = UISlotPanel.GetFocusedPanel();
-            if (focus_panel != this && IsVisible() && PlayerControls.IsAnyGamePad())
+            foreach (ActionSelectorButton button in buttons)
             {
-                prev_panel = focus_panel;
-                Focus();
+                button.onClick += OnClickAction;
             }
         }
 
-        private void RefreshSelector()
+        private void Start()
         {
-            PlayerCharacter character = GetPlayer();
+            //PlayerControlsMouse.Get().onClick += OnMouseClick;
+            PlayerControlsMouse.Get().onRightClick += OnMouseClick;
 
-            foreach (ActionSelectorButton button in slots)
+        }
+
+        void Update()
+        {
+            
+        }
+
+        private void RefreshPanel()
+        {
+            foreach (ActionSelectorButton button in buttons)
                 button.Hide();
 
             if (slot != null)
@@ -75,9 +55,9 @@ namespace SurvivalEngine
                 int index = 0;
                 foreach (SAction action in slot.GetItem().actions)
                 {
-                    if (index < slots.Length && !action.IsAuto() && action.CanDoAction(character, slot))
+                    if (index < buttons.Length && action.CanDoAction(character, slot))
                     {
-                        ActionSelectorButton button = (ActionSelectorButton) slots[index];
+                        ActionSelectorButton button = buttons[index];
                         button.SetButton(action);
                         index++;
                     }
@@ -85,69 +65,55 @@ namespace SurvivalEngine
             }
         }
 
-        public void Show(ItemSlot slot)
+        public void Show(PlayerCharacter character, ItemSlot slot)
         {
-            PlayerCharacter character = GetPlayer();
             if (slot != null && character != null)
             {
-                if (!IsVisible() || this.slot != slot)
+                if (!visible || this.slot != slot || this.character != character)
                 {
                     this.slot = slot;
-                    RefreshSelector();
+                    this.character = character;
+                    visible = true;
+                    RefreshPanel();
+                    animator.Rebind();
                     //animator.SetTrigger("Show");
                     transform.position = slot.transform.position;
                     gameObject.SetActive(true);
-                    animator.Rebind();
-                    animator.SetBool("Solo", CountActiveSlots() == 1);
-                    selection_index = 0;
-                    Show();
                 }
             }
         }
 
-        public override void Hide(bool instant = false)
+        public void Hide()
         {
-            if (IsVisible())
+            if (visible)
             {
-                base.Hide(instant);
+                character = null;
+                visible = false;
                 animator.SetTrigger("Hide");
+                Invoke("AfterHide", 1f);
             }
         }
 
-        private void OnClick(UISlot islot)
+        private void AfterHide()
         {
-            ActionSelectorButton button = (ActionSelectorButton)islot;
-            OnClickAction(button.GetAction());
-        }
-
-        private void OnAccept(UISlot slot)
-        {
-            OnClick(slot);
-            UISlotPanel.UnfocusAll();
-            if (prev_panel != null)
-                prev_panel.Focus();
-        }
-
-        private void OnCancel(UISlot slot)
-        {
-            ItemSlotPanel.CancelSelectionAll();
-            Hide();
+            if (!visible)
+                gameObject.SetActive(false);
         }
 
         public void OnClickAction(SAction action)
         {
-            if (IsVisible())
+            if (visible)
             {
-                PlayerCharacter character = GetPlayer();
                 if (action != null && slot != null && character != null)
                 {
                     ItemSlot aslot = slot;
+                    PlayerCharacter acharacter = character;
 
-                    PlayerUI.Get(character.player_id)?.CancelSelection();
+                    TheUI.Get().CancelSelection();
                     Hide();
 
-                    if (action.CanDoAction(character, aslot))
-                        action.DoAction(character, aslot);
+                    if (action.CanDoAction(acharacter, aslot))
+                        action.DoAction(acharacter, aslot);
 
                     
                 }
@@ -159,25 +125,14 @@ namespace SurvivalEngine
             Hide();
         }
 
-        public PlayerCharacter GetPlayer()
+        public bool IsVisible()
         {
-            return parent_ui ? parent_ui.GetPlayer() : PlayerCharacter.GetFirst();
+            return visible;
         }
 
-        public static ActionSelectorUI Get(int player_id=0)
+        public static ActionSelectorUI Get()
         {
-            foreach (ActionSelectorUI panel in selector_list)
-            {
-                PlayerCharacter player = panel.GetPlayer();
-                if (player != null && player.player_id == player_id)
-                    return panel;
-            }
-            return null;
-        }
-
-        public static new List<ActionSelectorUI> GetAll()
-        {
-            return selector_list;
+            return _instance;
         }
     }
 

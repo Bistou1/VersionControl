@@ -19,6 +19,7 @@ namespace SurvivalEngine
         public Vector3 entry_offset;
 
         private float timer = 0f;
+        private bool transition = false;
 
         private static List<ExitZone> exit_list = new List<ExitZone>();
 
@@ -37,16 +38,26 @@ namespace SurvivalEngine
             timer += Time.deltaTime;
         }
 
-        public void EnterZone()
+        private IEnumerator GoToRoutine()
         {
-            TheGame.Get().TransitionToScene(scene, go_to_index);
+            BlackPanel.Get().Show();
+            yield return new WaitForSeconds(1f);
+            SceneNav.GoToLevel(scene, go_to_index);
         }
 
         private void OnTriggerEnter(Collider collision)
         {
-            if (timer > 0.1f && collision.GetComponent<PlayerCharacter>())
+            if (!transition && timer > 1f && collision.GetComponent<PlayerCharacter>())
             {
-                EnterZone();
+                if (SceneNav.DoSceneExist(scene))
+                {
+                    transition = true;
+                    StartCoroutine(GoToRoutine());
+                }
+                else
+                {
+                    Debug.Log("Scene don't exist: " + scene);
+                }
             }
         }
 

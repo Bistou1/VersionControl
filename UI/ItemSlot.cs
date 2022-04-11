@@ -8,62 +8,135 @@ using UnityEngine.UI;
 namespace SurvivalEngine
 {
 
-    
+    public enum ItemSlotType
+    {
+        None = 0,
+        Inventory = 5,
+        Equipment = 10,
+        Storage = 15,
+    }
 
     /// <summary>
     /// Item slot that shows a single item, in your inventory or equipped bar
     /// </summary>
 
-    public class ItemSlot : UISlot
+    public class ItemSlot : MonoBehaviour
     {
-        [Header("Item Slot")]
+        public ItemSlotType type;
         public Image icon;
-        public Text value;
-        public Text title;
-        public Text dura;
-
-        [Header("Extra")]
         public Image default_icon;
         public Image highlight;
         public Image filter;
+        public Text value;
+        public Text dura;
+        public Text title;
 
+        public UnityAction<CraftData> onClick;
+        public UnityAction<CraftData> onClickRight;
+        public UnityAction<CraftData> onClickLong;
+        public UnityAction<CraftData> onClickDouble;
+        public UnityAction<CraftData> onPressKey;
+
+        [HideInInspector]
+        public int index = -1; //index in the bar
+
+        [HideInInspector]
+        public bool is_equip = false;
+
+        private EventTrigger evt_trigger;
+        private RectTransform rect;
         private Animator animator;
 
         private CraftData item;
         private int quantity;
         private float durability;
 
-        private float highlight_opacity = 1f;
+        private bool is_holding = false;
+        private bool can_click = false;
+        private float holding_timer = 0f;
+        private float double_timer = 0f;
 
-        protected override void Start()
+        void Start()
         {
-            base.Start();
-
+            rect = GetComponent<RectTransform>();
             animator = GetComponent<Animator>();
+            evt_trigger = GetComponent<EventTrigger>();
+
+            EventTrigger.Entry entry1 = new EventTrigger.Entry();
+            entry1.eventID = EventTriggerType.PointerClick;
+            entry1.callback.AddListener((BaseEventData eventData) => { OnClick(eventData); });
+            evt_trigger.triggers.Add(entry1);
+
+            EventTrigger.Entry entry2 = new EventTrigger.Entry();
+            entry2.eventID = EventTriggerType.PointerDown;
+            entry2.callback.AddListener((BaseEventData eventData) => { OnDown(eventData); });
+            evt_trigger.triggers.Add(entry2);
+
+            EventTrigger.Entry entry3 = new EventTrigger.Entry();
+            entry3.eventID = EventTriggerType.PointerUp;
+            entry3.callback.AddListener((BaseEventData eventData) => { OnUp(eventData); });
+            evt_trigger.triggers.Add(entry3);
+
+            EventTrigger.Entry entry4 = new EventTrigger.Entry();
+            entry4.eventID = EventTriggerType.PointerExit;
+            entry4.callback.AddListener((BaseEventData eventData) => { OnExit(eventData); });
+            evt_trigger.triggers.Add(entry4);
 
             if (highlight)
-            {
                 highlight.enabled = false;
-                highlight_opacity = highlight.color.a;
-            }
-
             if (dura)
                 dura.enabled = false;
         }
 
-        protected override void Update()
+        private void Update()
         {
-            base.Update();
+            if (double_timer < 1f)
+                double_timer += Time.deltaTime;
 
-            if (highlight != null)
+            //Hold
+            if (is_holding)
             {
-                highlight.enabled = selected || key_hover;
-                float alpha = selected ? highlight_opacity : (highlight_opacity * 0.8f);
-                highlight.color = new Color(highlight.color.r, highlight.color.g, highlight.color.b, alpha);
+                holding_timer += Time.deltaTime;
+                if (holding_timer > 0.5f)
+                {
+                    can_click = false;
+                    is_holding = false;
+                    if (onClickLong != null)
+                        onClickLong.Invoke(item);
+                }
+            }
+
+            //Keyboard shortcut
+            if (type == ItemSlotType.Inventory)
+            {
+                int key_index = (index + 1);
+                if (key_index == 10)
+                    key_index = 0;
+                if (key_index < 10 && Input.GetKeyDown(key_index.ToString()))
+                {
+                    if (onPressKey != null)
+                        onPressKey.Invoke(item);
+                }
             }
         }
 
-        public void SetSlot(CraftData item, int quantity, bool selected=false)
+        public void SelectSlot()
+        {
+            if (item != null)
+                highlight.enabled = true;
+        }
+
+        public void UnselectSlot()
+        {
+            highlight.enabled = false;
+        }
+
+        public bool IsSelected()
+        {
+            return highlight.enabled;
+        }
+
+        public void SetSlot(CraftData item, int quantity, float durability, bool selected)
         {
             if (item != null)
             {
@@ -71,18 +144,20 @@ namespace SurvivalEngine
                 int prevq = this.quantity;
                 this.item = item;
                 this.quantity = quantity;
-                this.durability = 0f;
+                this.durability = durability;
                 icon.sprite = item.icon;
                 icon.enabled = true;
                 value.text = quantity.ToString();
                 value.enabled = quantity > 1;
-                this.selected = selected;
 
                 if (title != null)
                 {
                     title.enabled = selected;
                     title.text = item.title;
                 }
+
+                if (highlight != null)
+                    highlight.enabled = selected;
 
                 if (default_icon != null)
                     default_icon.enabled = false;
@@ -91,6 +166,23 @@ namespace SurvivalEngine
                     dura.enabled = false;
                 if (filter != null)
                     filter.enabled = false;
+
+                if (item is ItemData)
+                {
+                    ItemData idata = (ItemData)item;
+                    int durabi = idata.GetDurabilityPercent(durability);
+                    if (dura != null)
+                    {
+                        dura.enabled = idata.HasDurability() && durabi < 100 && (idata.durability_type != DurabilityType.Spoilage || durabi <= 50);
+                        dura.text = durabi.ToString() + "%";
+                    }
+
+                    if (filter != null)
+                    {
+                        filter.enabled = idata.HasDurability() && durabi <= 40 && idata.durability_type == DurabilityType.Spoilage;
+                        filter.color = durabi <= 20 ? TheUI.Get().filter_red : TheUI.Get().filter_yellow;
+                    }
+                }
 
                 if (prev != item || prevq != quantity)
                     AnimateGain();
@@ -102,7 +194,6 @@ namespace SurvivalEngine
                 this.durability = 0f;
                 icon.enabled = false;
                 value.enabled = false;
-                this.selected = false;
 
                 if (dura != null)
                     dura.enabled = false;
@@ -113,6 +204,9 @@ namespace SurvivalEngine
                 if (title != null)
                     title.enabled = false;
 
+                if (highlight != null)
+                    highlight.enabled = false;
+
                 if (default_icon != null)
                     default_icon.enabled = true;
             }
@@ -120,16 +214,14 @@ namespace SurvivalEngine
             gameObject.SetActive(true);
         }
 
-        public void SetSlotCustom(Sprite sicon, string title, int quantity, bool selected=false)
+        public void SetSlotCustom(Sprite sicon, string title, bool selected)
         {
             this.item = null;
-            this.quantity = quantity;
+            this.quantity = 1;
             this.durability = 0f;
             icon.enabled = sicon != null;
             icon.sprite = sicon;
-            value.text = quantity.ToString();
-            value.enabled = quantity > 1;
-            this.selected = selected;
+            value.enabled = false;
 
             if (this.title != null)
             {
@@ -143,6 +235,9 @@ namespace SurvivalEngine
             if (filter != null)
                 filter.enabled = false;
 
+            if (highlight != null)
+                highlight.enabled = selected;
+
             if (default_icon != null)
                 default_icon.enabled = false;
 
@@ -155,44 +250,63 @@ namespace SurvivalEngine
                 this.title.enabled = true;
         }
 
-        public void SetDurability(int durability, bool show_value)
-        {
-            this.durability = durability;
-
-            if (dura != null)
-            {
-                dura.enabled = show_value;
-                dura.text = durability.ToString() + "%";
-            }
-        }
-
-        public void SetFilter(int filter_level)
-        {
-            if (filter != null)
-            {
-                filter.enabled = filter_level > 0;
-                filter.color = filter_level >= 2 ? TheUI.Get().filter_red : TheUI.Get().filter_yellow;
-            }
-        }
-
-        public void Select()
-        {
-            this.selected = true;
-            if (this.title != null)
-                this.title.enabled = true;
-        }
-
-        public void Unselect()
-        {
-            this.selected = false;
-            if (this.title != null)
-                this.title.enabled = false;
-        }
-
         public void AnimateGain()
         {
             if (animator != null)
                 animator.SetTrigger("Gain");
+        }
+
+        public void Hide()
+        {
+            gameObject.SetActive(false);
+        }
+
+        void OnClick(BaseEventData eventData)
+        {
+            if (can_click)
+            {
+
+            }
+        }
+
+        void OnDown(BaseEventData eventData)
+        {
+            is_holding = true;
+            can_click = true;
+            holding_timer = 0f;
+
+            PointerEventData pEventData = eventData as PointerEventData;
+
+            if (pEventData.button == PointerEventData.InputButton.Right)
+            {
+                if (onClickRight != null)
+                    onClickRight.Invoke(item);
+            }
+            else if (pEventData.button == PointerEventData.InputButton.Left)
+            {
+                if (double_timer < 0f)
+                {
+                    double_timer = 0f;
+                    if (onClickDouble != null)
+                        onClickDouble.Invoke(item);
+                }
+                else
+                {
+                    double_timer = -0.3f;
+                    if (onClick != null)
+                        onClick.Invoke(item);
+                }
+            }
+        }
+
+        void OnUp(BaseEventData eventData)
+        {
+            is_holding = false;
+        }
+
+        void OnExit(BaseEventData eventData)
+        {
+            is_holding = false;
         }
 
         public CraftData GetCraftable()
@@ -214,27 +328,19 @@ namespace SurvivalEngine
 
         public float GetDurability()
         {
-            return durability; //This returns the DISPLAY value in %, not the actual durability value
+            return durability;
         }
 
-        public string GetInventoryUID()
+        public ConstructionData GetConstruction()
         {
-            ItemSlotPanel parent_item = parent as ItemSlotPanel;
-            return parent_item?.GetInventoryUID();
-        }
-
-        public InventoryData GetInventory()
-        {
-            ItemSlotPanel parent_item = parent as ItemSlotPanel;
-            return parent_item?.GetInventory();
-        }
-
-        public InventoryItemData GetInventoryItem()
-        {
-            InventoryData inventory = GetInventory();
-            if (inventory != null)
-                return inventory.GetItem(index);
+            if (item != null)
+                return item.GetConstruction();
             return null;
+        }
+
+        public RectTransform GetRect()
+        {
+            return rect;
         }
 
     }

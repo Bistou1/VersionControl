@@ -10,10 +10,9 @@ namespace SurvivalEngine
     /// Generic script for any UI panel, can be inherited 
     /// </summary>
 
-    [RequireComponent(typeof(CanvasGroup))]
     public class UIPanel : MonoBehaviour
     {
-        public float display_speed = 4f;
+        public float display_speed = 2f;
 
         public UnityAction onShow;
         public UnityAction onHide;
@@ -90,11 +89,6 @@ namespace SurvivalEngine
         public bool IsVisible()
         {
             return visible;
-        }
-
-        public bool IsFullyVisible()
-        {
-            return visible && canvas_group.alpha > 0.99f;
         }
 
         public float GetAlpha()

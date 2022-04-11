@@ -14,23 +14,18 @@ namespace SurvivalEngine
     {
         public AttributeType attribute;
 
-        private PlayerUI parent_ui;
         private ProgressBar bar;
 
         void Awake()
         {
-            parent_ui = GetComponentInParent<PlayerUI>();
             bar = GetComponent<ProgressBar>();
         }
 
         void Update()
         {
-            PlayerCharacter character = parent_ui.GetPlayer();
-            if (character != null)
-            {
-                bar.SetMax(Mathf.RoundToInt(character.Attributes.GetAttributeMax(attribute)));
-                bar.SetValue(Mathf.RoundToInt(character.Attributes.GetAttributeValue(attribute)));
-            }
+            PlayerCharacter character = PlayerCharacter.Get();
+            bar.SetMax(Mathf.RoundToInt(character.GetAttributeMax(attribute)));
+            bar.SetValue(Mathf.RoundToInt(character.GetAttributeValue(attribute)));
         }
     }
 

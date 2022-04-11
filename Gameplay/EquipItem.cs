@@ -13,14 +13,11 @@ namespace SurvivalEngine
     {
         public ItemData data;
 
-        [Header("Weapons Anim")]
+        [Header("Weapons Only")]
         public string attack_melee_anim = "Attack";
         public string attack_ranged_anim = "Shoot";
-
-        [Header("Weapons Timing")]
-        public bool override_timing = false; //If true, the character default windup/windout will be overriden by thefollowing values
         public float attack_windup = 0.7f;
-        public float attack_windout = 0.4f;
+        public float attack_windout = 0.7f;
 
         [Header("Children Mesh")]
         public GameObject child_left;

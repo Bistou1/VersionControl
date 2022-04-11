@@ -13,7 +13,7 @@ namespace SurvivalEngine
     [RequireComponent(typeof(Selectable))]
     [RequireComponent(typeof(Buildable))]
     [RequireComponent(typeof(UniqueID))]
-    public class Construction : Craftable
+    public class Construction : MonoBehaviour
     {
         [Header("Construction")]
         public ConstructionData data;
@@ -21,33 +21,27 @@ namespace SurvivalEngine
         [HideInInspector]
         public bool was_spawned = false; //If true, means it was crafted or loaded from save file
 
-        private Selectable selectable; //Can be nulls
-        private Destructible destruct; //Can be nulls
+        private Selectable selectable;
         private Buildable buildable;
+        private Destructible destruct; //Can be nulls
         private UniqueID unique_id;
 
         private static List<Construction> construct_list = new List<Construction>();
 
-        protected override void Awake()
+        void Awake()
         {
-            base.Awake();
             construct_list.Add(this);
             selectable = GetComponent<Selectable>();
             buildable = GetComponent<Buildable>();
             destruct = GetComponent<Destructible>();
             unique_id = GetComponent<UniqueID>();
-
-            buildable.onBuild += OnBuild;
-
-            if (selectable != null)
-            {
-                selectable.onDestroy += OnDeath;
-            }
+            selectable.onUse += OnUse;
+            selectable.onDestroy += OnDeath;
+            buildable.onBuild += OnFinishBuild;
         }
 
-        protected override void OnDestroy()
+        void OnDestroy()
         {
-            base.OnDestroy();
             construct_list.Remove(this);
         }
 
@@ -65,17 +59,13 @@ namespace SurvivalEngine
 
         }
 
-        public void Kill()
+        private void OnUse(PlayerCharacter character)
         {
-            if (destruct != null)
-                destruct.Kill();
-            else if (selectable != null)
-                selectable.Destroy();
-            else
-                Destroy(gameObject);
+            //Use
+
         }
 
-        private void OnBuild()
+        public void OnFinishBuild()
         {
             if (data != null)
             {
@@ -84,29 +74,19 @@ namespace SurvivalEngine
             }
         }
 
+        public void Kill()
+        {
+            if (destruct != null)
+                destruct.Kill();
+            else
+                selectable.Destroy();
+        }
+
         private void OnDeath()
         {
-            if (data != null)
-            {
-                foreach (PlayerCharacter character in PlayerCharacter.GetAll())
-                    character.Data.AddKillCount(data.id); //Add kill count
-            }
-
             PlayerData.Get().RemoveConstruction(GetUID());
             if (!was_spawned)
                 PlayerData.Get().RemoveObject(GetUID());
-        }
-
-        public bool IsBuilt()
-        {
-            return !IsDead() && !buildable.IsBuilding();
-        }
-
-        public bool IsDead()
-        {
-            if(destruct)
-                return destruct.IsDead();
-            return false;
         }
 
         public bool HasUID()
@@ -119,16 +99,9 @@ namespace SurvivalEngine
             return unique_id.unique_id;
         }
 
-        public bool HasGroup(GroupData group)
-        {
-            if (data != null)
-                return data.HasGroup(group) || selectable.HasGroup(group);
-            return selectable.HasGroup(group);
-        }
-
         public Selectable GetSelectable()
         {
-            return selectable; //May be null
+            return selectable;
         }
 
         public Destructible GetDestructible()
@@ -141,52 +114,20 @@ namespace SurvivalEngine
             return buildable;
         }
 
-        public BuiltConstructionData SaveData
-        {
-            get { return PlayerData.Get().GetConstructed(GetUID()); }  //Can be null if not built or spawned
-        }
-
-        public static new Construction GetNearest(Vector3 pos, float range = 999f)
+        public static Construction GetNearest(Vector3 pos, float range = 999f)
         {
             Construction nearest = null;
             float min_dist = range;
             foreach (Construction construction in construct_list)
             {
                 float dist = (construction.transform.position - pos).magnitude;
-                if (dist < min_dist && construction.IsBuilt())
+                if (dist < min_dist)
                 {
                     min_dist = dist;
                     nearest = construction;
                 }
             }
             return nearest;
-        }
-
-        public static int CountInRange(Vector3 pos, float range)
-        {
-            int count = 0;
-            foreach (Construction construct in GetAll())
-            {
-                float dist = (construct.transform.position - pos).magnitude;
-                if (dist < range && construct.IsBuilt())
-                    count++;
-            }
-            return count;
-        }
-
-        public static int CountInRange(ConstructionData data, Vector3 pos, float range)
-        {
-            int count = 0;
-            foreach (Construction construct in GetAll())
-            {
-                if (construct.data == data && construct.IsBuilt())
-                {
-                    float dist = (construct.transform.position - pos).magnitude;
-                    if (dist < range)
-                        count++;
-                }
-            }
-            return count;
         }
 
         public static Construction GetByUID(string uid)
@@ -202,18 +143,7 @@ namespace SurvivalEngine
             return null;
         }
 
-        public static List<Construction> GetAllOf(ConstructionData data)
-        {
-            List<Construction> valid_list = new List<Construction>();
-            foreach (Construction construct in construct_list)
-            {
-                if (construct.data == data)
-                    valid_list.Add(construct);
-            }
-            return valid_list;
-        }
-
-        public static new List<Construction> GetAll()
+        public static List<Construction> GetAll()
         {
             return construct_list;
         }
@@ -222,7 +152,7 @@ namespace SurvivalEngine
         public static Construction Spawn(string uid, Transform parent = null)
         {
             BuiltConstructionData bdata = PlayerData.Get().GetConstructed(uid);
-            if (bdata != null && bdata.scene == SceneNav.GetCurrentScene())
+            if (bdata != null)
             {
                 ConstructionData cdata = ConstructionData.Get(bdata.construction_id);
                 if (cdata != null)
@@ -258,6 +188,7 @@ namespace SurvivalEngine
             return construct;
         }
 
+        //Create a totally new one that will be added to save file, already constructed
         public static Construction Create(ConstructionData data, Vector3 pos, Quaternion rot)
         {
             Construction construct = CreateBuildMode(data, pos);

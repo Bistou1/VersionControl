@@ -4,12 +4,11 @@ using UnityEngine;
 
 namespace SurvivalEngine
 {
-    public enum FreelookMode
-    {
-        Hold=0,
-        Toggle=10,
-        Always=20,
-        Never=30,
+
+    public enum CameraMode{
+        TopDown=0,
+        ThirdPerson = 10,
+        ThirdPersonShooter = 20, //Not working on mobile, require mouse
     }
 
     /// <summary>
@@ -18,23 +17,20 @@ namespace SurvivalEngine
 
     public class TheCamera : MonoBehaviour
     {
+        public CameraMode mode;
+
         [Header("Move/Zoom")]
-        public float move_speed = 10f;
+        public float move_speed = 2f;
         public float rotate_speed = 90f;
         public float zoom_speed = 0.5f;
+        public float zoom_speed_touch = 1f;
         public float zoom_in_max = 0.5f;
         public float zoom_out_max = 1f;
-        public bool inverted_rotate = false; //Rotating the camera controls will be reversed
-        public bool smooth_camera = true; //Camera will be more smooth but less accurate
 
-        [Header("Mobile Only")]
-        public float rotate_speed_touch = 10f; //Mobile touch
-        public float zoom_speed_touch = 1f; //Mobile touch
-
-        [Header("Third Person Only")]
-        public FreelookMode freelook_mode;
+        [Header("TPS Only")]
         public float freelook_speed_x = 0f;
         public float freelook_speed_y = 0f;
+        public bool toggle_freelook = false; //If set to true, toggle on click, otherwise hold.
 
         [Header("Target")]
         public GameObject follow_target;
@@ -47,7 +43,6 @@ namespace SurvivalEngine
         private float current_rotate = 0f;
         private float current_zoom = 0f;
         private Transform target_transform;
-        private bool is_locked = false;
 
         private Camera cam;
 
@@ -72,53 +67,48 @@ namespace SurvivalEngine
 
         private void Start()
         {
+            if (follow_target == null && PlayerCharacter.Get())
+            {
+                follow_target = PlayerCharacter.Get().gameObject;
+            }
+
+            if (mode == CameraMode.ThirdPersonShooter)
+            {
+                Cursor.lockState =  CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
+
             PlayerControlsMouse mouse = PlayerControlsMouse.Get();
+            //mouse.onClick += (Vector3 vect) => { if(!IsLocked()) SetLockMode(true); };
             mouse.onRightClick += (Vector3 vect) => { ToggleLock(); };
         }
 
         void LateUpdate()
         {
-            if (follow_target == null)
-            {
-                //Auto assign follow target
-                PlayerCharacter first = PlayerCharacter.GetFirst();
-                if (first != null)
-                    follow_target = first.gameObject;
-                return;
-            }
-
-            PlayerControls controls = PlayerControls.GetFirst();
+            PlayerControls controls = PlayerControls.Get();
             PlayerControlsMouse mouse = PlayerControlsMouse.Get();
 
             //Rotate
-            current_rotate = 0f;
-            current_rotate += controls.GetRotateCam() * rotate_speed;
-            if (inverted_rotate)
+            current_rotate = controls.GetRotateCam();
+            if (mode == CameraMode.TopDown)
                 current_rotate = -current_rotate; //Reverse rotate
-            current_rotate += mouse.GetTouchRotate() * rotate_speed_touch;
 
             //Zoom 
-            current_zoom += mouse.GetTouchZoom() * zoom_speed_touch; //Mobile 2 finger zoom
             current_zoom += mouse.GetMouseScroll() * zoom_speed; //Mouse scroll zoom
+            current_zoom += mouse.GetTouchZoom() * zoom_speed_touch; //Mobile 2 finger zoom
             current_zoom = Mathf.Clamp(current_zoom, -zoom_out_max, zoom_in_max);
 
-            if (freelook_mode == FreelookMode.Hold)
+            if (!toggle_freelook && mode == CameraMode.ThirdPersonShooter)
                 SetLockMode(mouse.IsMouseHoldRight());
-            if (freelook_mode == FreelookMode.Always)
-                SetLockMode(true);
-            if (freelook_mode == FreelookMode.Never)
-                SetLockMode(false);
-            if (controls.IsGamePad())
-                Cursor.visible = !is_locked && mouse.IsUsingMouse();
+            
+            if (!IsLocked())
+                UpdateNormal();
 
-            bool free_rotation = IsFreeRotation();
-            if (free_rotation)
-                UpdateFreeCamera();
-            else
-                UpdateCamera();
+            if (IsLocked())
+                UpdateShooter();
 
             //Untoggle if on top of UI
-            if (is_locked && TheUI.Get() && TheUI.Get().IsBlockingPanelOpened())
+            if (toggle_freelook && IsLocked() && TheUI.Get() && TheUI.Get().IsBlockingPanelOpened())
                 ToggleLock();
 
             //Shake FX
@@ -130,43 +120,30 @@ namespace SurvivalEngine
             }
         }
 
-        private void UpdateCamera()
+        private void UpdateNormal()
         {
-            rotated_offset = Quaternion.Euler(0, current_rotate * Time.deltaTime, 0) * rotated_offset;
-            target_transform.RotateAround(follow_target.transform.position, Vector3.up, current_rotate * Time.deltaTime);
+            rotated_offset = Quaternion.Euler(0, rotate_speed * current_rotate * Time.deltaTime, 0) * rotated_offset;
             current_offset = rotated_offset - rotated_offset * current_zoom;
+
+            target_transform.RotateAround(follow_target.transform.position, Vector3.up, rotate_speed * current_rotate * Time.deltaTime);
+            transform.rotation = Quaternion.Slerp(transform.rotation, target_transform.rotation, move_speed * Time.deltaTime);
 
             Vector3 target_pos = follow_target.transform.position + current_offset;
             target_transform.position = target_pos;
-
-            //Move to target position
-            if (smooth_camera)
-            {
-                transform.rotation = Quaternion.Slerp(transform.rotation, target_transform.rotation, move_speed * Time.deltaTime);
-                transform.position = Vector3.SmoothDamp(transform.position, target_transform.position, ref current_vel, 1f / move_speed);
-            }
-            else
-            {
-                transform.rotation = target_transform.rotation;
-                transform.position = target_transform.position;
-            }
+            transform.position = Vector3.SmoothDamp(transform.position, target_pos, ref current_vel, 1f / move_speed);
         }
 
-        private void UpdateFreeCamera()
+        private void UpdateShooter()
         {
-            PlayerControls controls = PlayerControls.GetFirst();
             PlayerControlsMouse mouse = PlayerControlsMouse.Get();
-            Vector2 mouse_delta = Vector2.zero;
-            if(is_locked)
-                mouse_delta += mouse.GetMouseDelta();
-            if(controls.IsGamePad())
-                mouse_delta += controls.GetFreelook();
+            Vector2 mouse_delta = mouse.GetMouseDelta();
 
             Quaternion target_backup = target_transform.transform.rotation;
             Vector3 rotate_backup = rotated_offset;
 
             rotated_offset = Quaternion.AngleAxis(freelook_speed_y * -mouse_delta.y * 0.5f * Time.deltaTime, target_transform.right) * rotated_offset;
             rotated_offset = Quaternion.Euler(0f, freelook_speed_x * mouse_delta.x * Time.deltaTime, 0) * rotated_offset;
+            current_offset = rotated_offset - rotated_offset * current_zoom;
 
             target_transform.RotateAround(follow_target.transform.position, target_transform.right, freelook_speed_y * -mouse_delta.y * Time.deltaTime);
             target_transform.RotateAround(follow_target.transform.position, Vector3.up, freelook_speed_x * mouse_delta.x * Time.deltaTime);
@@ -178,28 +155,16 @@ namespace SurvivalEngine
                 rotated_offset = rotate_backup;
             }
 
-            current_offset = rotated_offset - rotated_offset * current_zoom;
             Vector3 target_pos = follow_target.transform.position + current_offset;
             target_transform.position = target_pos;
-
-            //Move to target position
-            if (smooth_camera)
-            {
-                transform.rotation = Quaternion.Slerp(transform.rotation, target_transform.rotation, move_speed * Time.deltaTime);
-                transform.position = Vector3.SmoothDamp(transform.position, target_transform.position, ref current_vel, 1f / move_speed);
-            }
-            else
-            {
-                transform.rotation = target_transform.rotation;
-                transform.position = target_transform.position;
-            }
+            transform.position = Vector3.Lerp(transform.position, target_pos, move_speed * Time.deltaTime);
+            transform.rotation = Quaternion.Slerp(transform.rotation, target_transform.rotation, move_speed * Time.deltaTime);
         }
 
         public void SetLockMode(bool locked)
         {
-            if (is_locked != locked)
+            if (mode == CameraMode.ThirdPersonShooter)
             {
-                is_locked = locked;
                 Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
                 Cursor.visible = !locked;
             }
@@ -207,9 +172,9 @@ namespace SurvivalEngine
 
         public void ToggleLock()
         {
-            if (freelook_mode == FreelookMode.Toggle)
+            if (toggle_freelook)
             {
-                SetLockMode(!is_locked);
+                SetLockMode(Cursor.lockState != CursorLockMode.Locked);
             }
         }
 
@@ -254,20 +219,6 @@ namespace SurvivalEngine
             return dir.normalized;
         }
 
-        //Get camera direction for shooting projectiles, will only work if IsFreeRotation
-        public Vector3 GetAimDir(PlayerCharacter character, float distance = 10f)
-        {
-            Vector3 far = transform.position + transform.forward * distance;
-            Vector3 aim = far - character.GetColliderCenter();
-            return aim.normalized;
-        }
-
-        //Direct aim dir from the camera
-        public Vector3 GetFacingDir()
-        {
-            return transform.forward;
-        }
-
         public Quaternion GetFacingRotation()
         {
             Vector3 facing = GetFacingFront();
@@ -276,13 +227,7 @@ namespace SurvivalEngine
 
         public bool IsLocked()
         {
-            return is_locked;
-        }
-
-        public bool IsFreeRotation()
-        {
-            PlayerControls controls = PlayerControls.GetFirst();
-            return freelook_mode != FreelookMode.Never && (is_locked || controls.IsGamePad());
+            return Cursor.lockState == CursorLockMode.Locked;
         }
 
         public Camera GetCam()

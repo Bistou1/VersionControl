@@ -1,7 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
@@ -16,20 +15,29 @@ namespace SurvivalEngine
     {
         [Header("Panels")]
         public CanvasGroup gameplay_ui;
-        public PausePanel pause_panel;
-        public GameOverPanel game_over_panel;
+        public UIPanel pause_panel;
+        public UIPanel game_over_panel;
+        public UIPanel damage_fx;
 
         [Header("Material")]
         public Material ui_material;
         public Material text_material;
-        
+
+        [Header("Others")]
+        public Text build_mode_text;
+        public Image tps_cursor;
+
         public AudioClip ui_sound;
+        public Image speaker_btn;
+        public Sprite speaker_on;
+        public Sprite speaker_off;
 
         public Color filter_red;
         public Color filter_yellow;
 
         private Canvas canvas;
         private RectTransform rect;
+        private bool ui_hidden = false;
 
         private static TheUI _instance;
 
@@ -38,6 +46,9 @@ namespace SurvivalEngine
             _instance = this;
             canvas = GetComponent<Canvas>();
             rect = GetComponent<RectTransform>();
+
+            if (build_mode_text != null)
+                build_mode_text.enabled = false;
 
             if (ui_material != null)
             {
@@ -55,50 +66,60 @@ namespace SurvivalEngine
         {
             canvas.worldCamera = TheCamera.GetCamera();
 
-            if (!TheGame.IsMobile() && ItemSelectedFX.Get() == null && AssetData.Get().item_select_fx != null)
-            {
-                Instantiate(AssetData.Get().item_select_fx, transform.position, Quaternion.identity);
-            }
-
-            if (ItemDragFX.Get() == null && AssetData.Get().item_drag_fx != null)
-            {
-                Instantiate(AssetData.Get().item_drag_fx, transform.position, Quaternion.identity);
-            }
-
-            PlayerUI gameplay_ui = GetComponentInChildren<PlayerUI>();
-            if (gameplay_ui == null)
-                Debug.LogError("Warning: Missing PlayerUI script on the Gameplay tab in the UI prefab");
+            PlayerCharacter.Get().onDamaged += DoDamageFX;
         }
 
         void Update()
         {
             pause_panel.SetVisible(TheGame.Get().IsPausedByPlayer());
+            speaker_btn.sprite = PlayerData.Get().master_volume > 0.1f ? speaker_on : speaker_off;
 
-            foreach (PlayerControls controls in PlayerControls.GetAll())
-            {
-                if (controls.IsPressPause() && !TheGame.Get().IsPausedByPlayer())
-                    TheGame.Get().Pause();
-                else if (controls.IsPressPause() && TheGame.Get().IsPausedByPlayer())
-                    TheGame.Get().Unpause();
-            }
+            if (build_mode_text != null)
+                build_mode_text.enabled = PlayerCharacter.Get().IsBuildMode();
 
-            //Gamepad auto focus
-            UISlotPanel focus_panel = UISlotPanel.GetFocusedPanel();
-            if (focus_panel != pause_panel && TheGame.Get().IsPausedByPlayer() && PlayerControls.IsAnyGamePad())
-            {
-                pause_panel.Focus();
-            }
-            if (focus_panel == pause_panel && !TheGame.Get().IsPausedByPlayer())
-            {
-               UISlotPanel.UnfocusAll();
-            }
+            if (tps_cursor != null)
+                tps_cursor.enabled = TheCamera.Get().IsLocked();
+        }
+
+        public void DoDamageFX()
+        {
+            StartCoroutine(DamageFXRun());
+        }
+
+        private IEnumerator DamageFXRun()
+        {
+            damage_fx.Show();
+            yield return new WaitForSeconds(1f);
+            damage_fx.Hide();
+        }
+
+        public void CancelSelection()
+        {
+            EquipBar.Get().CancelSelection();
+            CraftBar.Get().CancelSelection();
+            InventoryBar.Get().CancelSelection();
+            StorageBar.Get().CancelSelection();
+            PlayerCharacter.Get().CancelBuilding();
+            ActionSelectorUI.Get().Hide();
+            ActionSelector.Get().Hide();
         }
 
         public void ShowGameOver()
         {
-            foreach(PlayerUI ui in PlayerUI.GetAll())
-                ui.CancelSelection();
+            CancelSelection();
             game_over_panel.Show();
+        }
+
+        public void ShowUI()
+        {
+            ui_hidden = false;
+            gameplay_ui.alpha = 1f;
+        }
+
+        public void HideUI()
+        {
+            ui_hidden = true;
+            gameplay_ui.alpha = 0f;
         }
 
         public void OnClickPause()
@@ -111,14 +132,65 @@ namespace SurvivalEngine
             TheAudio.Get().PlaySFX("UI", ui_sound);
         }
 
-        public bool IsBlockingPanelOpened()
+        public void OnClickSave()
         {
-            return StoragePanel.IsAnyVisible() || ReadPanel.IsAnyVisible() || pause_panel.IsVisible() || game_over_panel.IsVisible();
+            TheGame.Get().Save();
         }
 
-        public bool IsFullPanelOpened()
+        public void OnClickLoad()
         {
-            return pause_panel.IsVisible() || game_over_panel.IsVisible();
+            StartCoroutine(LoadRoutine());
+        }
+
+        public void OnClickNew()
+        {
+            StartCoroutine(NewRoutine());
+        }
+
+        private IEnumerator LoadRoutine()
+        {
+            BlackPanel.Get().Show();
+
+            yield return new WaitForSeconds(1f);
+
+            PlayerData.Unload(); //Make sure to unload first, or it won't load if already loaded
+            PlayerData.LoadLast();
+            SceneNav.GoTo(PlayerData.Get().current_scene);
+        }
+
+        private IEnumerator NewRoutine()
+        {
+            BlackPanel.Get().Show();
+
+            yield return new WaitForSeconds(1f);
+
+            PlayerData.NewGame();
+            SceneNav.GoTo(SceneNav.GetCurrentScene());
+        }
+
+        public void OnClickCraft()
+        {
+            CancelSelection();
+            CraftBar.Get().ToggleBar();
+        }
+
+        public void OnClickMusicToggle()
+        {
+            PlayerData.Get().master_volume = PlayerData.Get().master_volume > 0.1f ? 0f : 1f;
+            TheAudio.Get().RefreshVolume();
+        }
+
+        public ItemSlot GetSelectedItemSlot()
+        {
+            ItemSlot eslot = EquipBar.Get().GetSelectedSlot();
+            ItemSlot sslot = StorageBar.Get().GetSelectedSlot();
+            ItemSlot islot = InventoryBar.Get().GetSelectedSlot();
+
+            if (eslot != null)
+                return eslot;
+            if (sslot != null)
+                return sslot;
+            return islot;
         }
 
         //Convert a screen position (like mouse) to a anchored position in the canvas
@@ -129,23 +201,14 @@ namespace SurvivalEngine
             return localpoint;
         }
 
-        public Vector2 ScreenPointToCanvasPos(Vector2 pos, RectTransform localRect)
+        public bool IsHidden()
         {
-            Vector2 localpoint;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(localRect, pos, canvas.worldCamera, out localpoint);
-            return localpoint;
+            return ui_hidden;
         }
 
-        public Vector2 WorldToCanvasPos(Vector3 world)
+        public bool IsBlockingPanelOpened()
         {
-            Vector2 screen_pos = TheCamera.GetCamera().WorldToScreenPoint(world);
-            return ScreenPointToCanvasPos(screen_pos);
-        }
-
-        //Menu are panels that block gamepad controls
-        public bool IsMenuOpened()
-        {
-            return pause_panel.IsVisible() || game_over_panel.IsVisible();
+            return StorageBar.Get().IsVisible() || ReadPanel.Get().IsVisible() || pause_panel.IsVisible() || game_over_panel.IsVisible();
         }
 
         public static TheUI Get()

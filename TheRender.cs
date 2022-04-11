@@ -12,6 +12,12 @@ namespace SurvivalEngine
 
     public class TheRender : MonoBehaviour
     {
+        [Header("Optimization")]
+        public float refresh_rate = 0.5f; //In seconds, interval at which selectable are shown/hidden
+        public float distance_multiplier = 1f; //will make all selectable active_range multiplied
+        public float active_area_facing_offset = 10f; //active area will be offset by X in the direction the camera is facing
+        public bool turn_off_gameobjects = false; //If on, will turn off the whole gameObjects, otherwise will just turn off scripts
+
         private Light dir_light;
         private Quaternion start_rot;
         private float update_timer = 0f;
@@ -21,8 +27,7 @@ namespace SurvivalEngine
             //Light
             GameData gdata = GameData.Get();
             bool is_night = TheGame.Get().IsNight();
-            dir_light = GetDirectionalLight();
-
+            dir_light = FindObjectOfType<Light>();
             float target = is_night ? gdata.night_light_ambient_intensity : gdata.day_light_ambient_intensity;
             float light_angle = PlayerData.Get().day_time * 360f / 24f;
             RenderSettings.ambientIntensity = target;
@@ -42,14 +47,13 @@ namespace SurvivalEngine
             //Day night
             GameData gdata = GameData.Get();
             bool is_night = TheGame.Get().IsNight();
-            float light_mult = GetLightMult();
             float target = is_night ? gdata.night_light_ambient_intensity : gdata.day_light_ambient_intensity;
             float light_angle = PlayerData.Get().day_time * 360f / 24f;
-            RenderSettings.ambientIntensity = Mathf.MoveTowards(RenderSettings.ambientIntensity, target * light_mult, 0.2f * Time.deltaTime);
+            RenderSettings.ambientIntensity = Mathf.MoveTowards(RenderSettings.ambientIntensity, target, 0.2f * Time.deltaTime);
             if (dir_light != null && dir_light.type == LightType.Directional)
             {
                 float dtarget = is_night ? gdata.night_light_dir_intensity : gdata.day_light_dir_intensity;
-                dir_light.intensity = Mathf.MoveTowards(dir_light.intensity, dtarget * light_mult, 0.2f * Time.deltaTime);
+                dir_light.intensity = Mathf.MoveTowards(dir_light.intensity, dtarget, 0.2f * Time.deltaTime);
                 dir_light.shadowStrength = Mathf.MoveTowards(dir_light.shadowStrength, is_night ? 0f : 1f, 0.2f * Time.deltaTime);
                 if (gdata.rotate_shadows)
                     dir_light.transform.rotation = Quaternion.Euler(0f, light_angle + 180f, 0f) * start_rot;
@@ -57,7 +61,7 @@ namespace SurvivalEngine
 
             //Slow update
             update_timer += Time.deltaTime;
-            if (update_timer > GameData.Get().optim_refresh_rate)
+            if (update_timer > refresh_rate)
             {
                 update_timer = 0f;
                 SlowUpdate();
@@ -67,29 +71,12 @@ namespace SurvivalEngine
         void SlowUpdate()
         {
             //Optimization
-            Vector3 center_pos = TheCamera.Get().GetTargetPosOffsetFace(GameData.Get().optim_facing_offset);
+            Vector3 center_pos = TheCamera.Get().GetTargetPosOffsetFace(active_area_facing_offset);
             foreach (Selectable select in Selectable.GetAll())
             {
                 float dist = (select.GetPosition() - center_pos).magnitude;
-                select.SetActive(dist < select.active_range * GameData.Get().optim_distance_multiplier, GameData.Get().optim_turn_off_gameobjects);
+                select.SetActive(dist < select.active_range * distance_multiplier, turn_off_gameobjects);
             }
-        }
-
-        public Light GetDirectionalLight()
-        {
-            foreach (Light light in FindObjectsOfType<Light>())
-            {
-                if (light.type == LightType.Directional)
-                    return light;
-            }
-            return null;
-        }
-
-        public float GetLightMult()
-        {
-            if (WeatherSystem.Get())
-                return WeatherSystem.Get().GetLightMult();
-            return 1f;
         }
     }
 

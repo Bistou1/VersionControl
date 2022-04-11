@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using UnityEngine;
-using UnityEngine.Events;
 
 namespace SurvivalEngine
 {
@@ -13,14 +12,13 @@ namespace SurvivalEngine
 
     [RequireComponent(typeof(Selectable))]
     [RequireComponent(typeof(UniqueID))]
-    public class Item : Craftable
+    public class Item : MonoBehaviour
     {
         [Header("Item")]
         public ItemData data;
         public int quantity = 1;
 
         [Header("FX")]
-        public float auto_collect_range = 0f; //Will automatically be collected when in range
         public bool snap_to_ground = true; //If true, item will be automatically placed on the ground instead of floating if spawns in the air
         public AudioClip take_audio;
         public GameObject take_fx;
@@ -28,26 +26,21 @@ namespace SurvivalEngine
         [HideInInspector]
         public bool was_spawned = false; //If true, item was dropped by the player, or loaded from save file
 
-        public UnityAction onTake;
-        public UnityAction onDestroy;
-
         private Selectable selectable;
         private UniqueID unique_id;
 
         private static List<Item> item_list = new List<Item>();
 
-        protected override void Awake()
+        void Awake()
         {
-            base.Awake();
             item_list.Add(this);
             selectable = GetComponent<Selectable>();
             unique_id = GetComponent<UniqueID>();
             selectable.onUse += OnUse;
         }
 
-        protected override void OnDestroy()
+        private void OnDestroy()
         {
-            base.OnDestroy();
             item_list.Remove(this);
         }
 
@@ -85,38 +78,41 @@ namespace SurvivalEngine
                         DestroyItem(); //Destroy item from durability
                 }
             }
-
-            if (auto_collect_range > 0.1f)
-            {
-                PlayerCharacter player = PlayerCharacter.GetNearest(transform.position, auto_collect_range);
-                if (player != null)
-                    player.Inventory.AutoTakeItem(this);
-            }
         }
 
         private void OnUse(PlayerCharacter character)
         {
             //Take
-            character.Inventory.TakeItem(this);
+            character.TakeItem(this);
         }
 
         public void TakeItem()
         {
-            if (onTake != null)
-                onTake.Invoke();
+            PlayerData pdata = PlayerData.Get();
+            if (CanTakeItem())
+            {
+                DroppedItemData dropped_item = pdata.GetDroppedItem(GetUID());
+                float durability = dropped_item != null ? dropped_item.durability : data.durability;
+                int slot = pdata.AddItem(data.id, quantity, durability); //Add to inventory
 
-            DestroyItem();
+                DestroyItem();
 
-            TheAudio.Get().PlaySFX("item", take_audio);
-            if (take_fx != null)
-                Instantiate(take_fx, transform.position, Quaternion.identity);
+                //Take fx
+                ItemTakeFX.DoTakeFX(transform.position, data, slot);
+
+                TheAudio.Get().PlaySFX("item", take_audio);
+                if (take_fx != null)
+                    Instantiate(take_fx, transform.position, Quaternion.identity);
+            }
         }
 
         //Destroy content but keep container
         public void SpoilItem()
         {
             if (data.container_data)
-                Item.Create(data.container_data, transform.position, quantity);
+            {
+                Item.Create(data.container_data, transform.position, quantity, data.container_data.durability);
+            }
             DestroyItem();
         }
 
@@ -128,12 +124,13 @@ namespace SurvivalEngine
             else
                 pdata.RemoveObject(GetUID()); //Taken from map
 
-            item_list.Remove(this);
-
-            if (onDestroy != null)
-                onDestroy.Invoke();
-
             Destroy(gameObject);
+        }
+
+        public bool CanTakeItem()
+        {
+            PlayerData pdata = PlayerData.Get();
+            return gameObject.activeSelf && pdata.CanTakeItem(data.id, quantity);
         }
 
         private bool DetectGrounded(out float dist)
@@ -160,22 +157,12 @@ namespace SurvivalEngine
             return unique_id.unique_id;
         }
 
-        public bool HasGroup(GroupData group)
-        {
-            return data.HasGroup(group) || selectable.HasGroup(group);
-        }
-
         public Selectable GetSelectable()
         {
             return selectable;
         }
 
-        public DroppedItemData SaveData
-        {
-            get { return PlayerData.Get().GetDroppedItem(GetUID()); }  //Can be null if not dropped or spawned
-        }
-
-        public static new Item GetNearest(Vector3 pos, float range = 999f)
+        public static Item GetNearest(Vector3 pos, float range = 999f)
         {
             Item nearest = null;
             float min_dist = range;
@@ -191,33 +178,6 @@ namespace SurvivalEngine
             return nearest;
         }
 
-        public static int CountInRange(Vector3 pos, float range)
-        {
-            int count = 0;
-            foreach (Item item in GetAll())
-            {
-                float dist = (item.transform.position - pos).magnitude;
-                if (dist < range)
-                    count++;
-            }
-            return count;
-        }
-
-        public static int CountInRange(ItemData data, Vector3 pos, float range)
-        {
-            int count = 0;
-            foreach (Item item in GetAll())
-            {
-                if (item.data == data)
-                {
-                    float dist = (item.transform.position - pos).magnitude;
-                    if (dist < range)
-                        count++;
-                }
-            }
-            return count;
-        }
-
         public static Item GetByUID(string uid)
         {
             if (!string.IsNullOrEmpty(uid))
@@ -231,18 +191,7 @@ namespace SurvivalEngine
             return null;
         }
 
-        public static List<Item> GetAllOf(ItemData data)
-        {
-            List<Item> valid_list = new List<Item>();
-            foreach (Item item in item_list)
-            {
-                if (item.data == data)
-                    valid_list.Add(item);
-            }
-            return valid_list;
-        }
-
-        public static new List<Item> GetAll()
+        public static List<Item> GetAll()
         {
             return item_list;
         }
@@ -251,7 +200,7 @@ namespace SurvivalEngine
         public static Item Spawn(string uid, Transform parent = null)
         {
             DroppedItemData ddata = PlayerData.Get().GetDroppedItem(uid);
-            if (ddata != null && ddata.scene == SceneNav.GetCurrentScene())
+            if (ddata != null)
             {
                 ItemData idata = ItemData.Get(ddata.item_id);
                 if (idata != null)
@@ -271,22 +220,9 @@ namespace SurvivalEngine
         }
 
         //Create a totally new one that will be added to save file
-        public static Item Create(ItemData data, Vector3 pos, int quantity)
+        public static Item Create(ItemData data, Vector3 pos, int quantity, float durability)
         {
-            DroppedItemData ditem = PlayerData.Get().AddDroppedItem(data.id, SceneNav.GetCurrentScene(), pos, quantity, data.durability);
-            GameObject obj = Instantiate(data.item_prefab, pos, data.item_prefab.transform.rotation);
-            Item item = obj.GetComponent<Item>();
-            item.data = data;
-            item.was_spawned = true;
-            item.unique_id.unique_id = ditem.uid;
-            item.quantity = quantity;
-            return item;
-        }
-
-        //Create a new item that existed in inventory (such as when dropping it)
-        public static Item Create(ItemData data, Vector3 pos, int quantity, float durability, string uid)
-        {
-            DroppedItemData ditem = PlayerData.Get().AddDroppedItem(data.id, SceneNav.GetCurrentScene(), pos, quantity, durability, uid);
+            DroppedItemData ditem = PlayerData.Get().AddDroppedItem(data.id, SceneNav.GetCurrentScene(), pos, quantity, durability);
             GameObject obj = Instantiate(data.item_prefab, pos, data.item_prefab.transform.rotation);
             Item item = obj.GetComponent<Item>();
             item.data = data;

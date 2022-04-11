@@ -7,8 +7,10 @@ namespace SurvivalEngine
 {
     public enum BuildableType {
 
-        Default=0,
-        Grid=10,
+        Floor=0,
+        Anywhere=5,
+        GridFloor=10,
+        GridAnywhere=15
 
     }
 
@@ -16,6 +18,7 @@ namespace SurvivalEngine
     /// Buildable is the base script for objects that can be placed on the map and have a build mode (transparent version of model that follow mouse)
     /// </summary>
 
+    [RequireComponent(typeof(Selectable))]
     public class Buildable : MonoBehaviour
     {
         [Header("Buildable")]
@@ -24,12 +27,9 @@ namespace SurvivalEngine
         public float grid_size = 1f;
 
         [Header("Build Obstacles")]
-        public LayerMask floor_layer = 1 << 9; //Will build on top of this layer
-        public LayerMask obstacle_layer = 1; //Cant build if of those obstacles
+        public LayerMask obstacle_layer = 1; //Cant build on top of those obstacles
         public float build_obstacle_radius = 0.4f; //Can't build if obstacles within radius
         public float build_ground_dist = 0.4f; //Ground must be at least this distance on all 4 sides to build (prevent building on a wall or in the air)
-        public bool build_flat_floor = false; //If true, must be built on mostly flat floor
-        public bool auto_destroy = false; //If true, will be destroyed if the floor underneath get destroyed
 
         [Header("FX")]
         public AudioClip build_audio;
@@ -37,17 +37,13 @@ namespace SurvivalEngine
 
         public UnityAction onBuild;
 
-        protected Selectable selectable; //Can be nulls
+        protected Selectable selectable;
         protected Destructible destruct; //Can be nulls
         protected UniqueID unique_id; //Can be nulls
 
-        private PlayerCharacter building_character = null;
         private bool building_mode = false; //Building mode means player is selecting where to build it, but it doesnt really exists yet
         private bool position_set = false;
-        private bool visible_set = true;
         private Color prev_color = Color.white;
-        private float manual_rotate = 0f;
-        private float update_timer = 0f;
 
         private List<Collider> colliders = new List<Collider>();
         private List<MeshRenderer> renders = new List<MeshRenderer>();
@@ -66,14 +62,12 @@ namespace SurvivalEngine
             {
                 foreach (Material material in render.sharedMaterials)
                 {
-                    bool valid_mat = material && MaterialTool.HasColor(material);
-                    Material material_normal = valid_mat ? new Material(material) : null;
-                    Material material_trans = valid_mat ? new Material(material) : null;
-                    if (material_trans != null)
-                        MaterialTool.ChangeRenderMode(material_trans, BlendMode.Fade);
+                    Material material_normal = new Material(material);
+                    Material material_trans = new Material(material);
+                    MaterialTool.ChangeRenderMode(material_trans, BlendMode.Fade);
                     materials.Add(material_normal);
                     materials_transparent.Add(material_trans);
-                    materials_color.Add(valid_mat ? material.color : Color.white);
+                    materials_color.Add(material.color);
                 }
             }
 
@@ -93,33 +87,24 @@ namespace SurvivalEngine
 
         void Update()
         {
-            if (building_mode && building_character != null)
+            if (building_mode)
             {
-                PlayerControls constrols = PlayerControls.Get(building_character.player_id);
+                PlayerControls constrols = PlayerControls.Get();
                 PlayerControlsMouse mouse = PlayerControlsMouse.Get();
 
                 if (!position_set)
                 {
-                    if (constrols.IsGamePad())
+                    if (mouse.IsUsingMouse() || Mathf.Abs(constrols.GetRotateCam()) > 0.1f)
                     {
-                        //Controller Game Pad building
-                        transform.position = building_character.transform.position + building_character.transform.forward * build_distance;
-                        transform.rotation = Quaternion.Euler(0f, manual_rotate, 0f) * Quaternion.LookRotation(building_character.GetFacing(), Vector3.up);
-                    }
-                    else
-                    {
-                        //Mouse/Touch controls
                         transform.position = mouse.GetPointingPos();
-                        transform.rotation = Quaternion.Euler(0f, manual_rotate, 0f) * TheCamera.Get().GetFacingRotation();
-                    }
+                        transform.rotation = TheCamera.Get().GetFacingRotation();
 
-                    //Snap to grid
-                    FindAutoPosition();
-
-                    //Show/Hide on mobile
-                    if (TheGame.IsMobile())
-                    {
-                        SetBuildVisible(mouse.IsMouseHold());
+                        if (type == BuildableType.Anywhere)
+                            transform.position = FindBuildPosition(mouse.GetPointingPos());
+                        if(type == BuildableType.GridFloor)
+                            transform.position = FindGridPosition(mouse.GetPointingPos());
+                        if (type == BuildableType.GridAnywhere)
+                            transform.position = FindBuildPosition(FindGridPosition(mouse.GetPointingPos()));
                     }
                 }
 
@@ -128,33 +113,14 @@ namespace SurvivalEngine
                 SetModelColor(new Color(color.r, color.g, color.b, 0.5f), !can_build);
 
             }
-
-            update_timer += Time.deltaTime;
-            if (update_timer > 0.5f) {
-                update_timer = Random.Range(-0.02f, 0.02f);
-                SlowUpdate(); //Optimization
-            }
-            
         }
 
-        private void SlowUpdate() {
-            if (destruct != null && auto_destroy && !destruct.IsDead() && !building_mode)
-            {
-                if (!CheckValidFloorBuilt() || !CheckIfFlatGround())
-                {
-                    destruct.Kill();
-                }
-            }
-        }
-
-        public void StartBuild(PlayerCharacter character)
+        public void StartBuild()
         {
             building_mode = true;
             position_set = false;
-            building_character = character;
 
-            if(selectable != null)
-                selectable.enabled = false;
+            selectable.enabled = false;
             if (destruct)
                 destruct.enabled = false;
 
@@ -163,39 +129,29 @@ namespace SurvivalEngine
 
             if (TheGame.IsMobile()) //Hide on mobile
             {
-                SetBuildVisible(false);
-            }
-        }
-
-        public void SetBuildVisible(bool visible)
-        {
-            if (visible_set != visible)
-            {
-                visible_set = visible;
                 foreach (MeshRenderer mesh in renders)
-                    mesh.enabled = visible;
-            }
-        }
-
-        public void SetBuildPositionTemporary(Vector3 pos)
-        {
-            if (building_mode)
-            {
-                transform.position = pos;
-                FindAutoPosition();
+                    mesh.enabled = false;
             }
         }
 
         public void SetBuildPosition(Vector3 pos)
         {
-            if (building_mode)
+            if (building_mode && !position_set)
             {
                 position_set = true;
                 transform.position = pos;
 
-                FindAutoPosition();
+                if (type == BuildableType.Anywhere)
+                    transform.position = FindBuildPosition(pos);
 
-                SetBuildVisible(true);
+                if (type == BuildableType.GridFloor)
+                    transform.position = FindGridPosition(pos);
+
+                if (type == BuildableType.GridAnywhere)
+                    transform.position = FindBuildPosition(FindGridPosition(pos));
+
+                foreach (MeshRenderer mesh in renders)
+                    mesh.enabled = true;
             }
         }
 
@@ -204,18 +160,17 @@ namespace SurvivalEngine
             gameObject.SetActive(true);
             building_mode = false;
             position_set = true;
-            building_character = null;
 
             foreach (Collider collide in colliders)
                 collide.isTrigger = false;
+            foreach (MeshRenderer mesh in renders)
+                mesh.enabled = true;
 
-            SetBuildVisible(true);
-
-            if (selectable != null)
-                selectable.enabled = true;
-
+            selectable.enabled = true;
             if (destruct)
+            {
                 destruct.enabled = true;
+            }
 
             SetModelColor(Color.white, false);
 
@@ -224,15 +179,6 @@ namespace SurvivalEngine
             
             if (onBuild != null)
                 onBuild.Invoke();
-        }
-
-        //Call this function to rotate building manually (like by using a key)
-        public void RotateManually(float angle_y)
-        {
-            if (building_mode)
-            {
-                manual_rotate += angle_y;
-            }
         }
 
         private void SetModelColor(Color color, bool replace)
@@ -249,14 +195,11 @@ namespace SurvivalEngine
                         {
                             Material mesh_mat = mesh_materials[i];
                             Material ref_mat = color.a < 0.99f ? materials_transparent[index] : materials[index];
-                            if (ref_mat != null)
-                            {
-                                ref_mat.color = materials_color[index] * color;
-                                if (replace)
-                                    ref_mat.color = color;
-                                if (ref_mat != mesh_mat)
-                                    mesh_materials[i] = ref_mat;
-                            }
+                            ref_mat.color = materials_color[index] * color;
+                            if (replace)
+                                ref_mat.color = color; 
+                            if (ref_mat != mesh_mat)
+                                mesh_materials[i] = ref_mat;
                         }
                         index++;
                     }
@@ -270,23 +213,21 @@ namespace SurvivalEngine
         //Check if possible to build at current position
         public bool CheckIfCanBuild()
         {
-            bool dont_overlap = !CheckIfOverlap();
-            bool flat_ground = CheckIfFlatGround();
-            bool accessible = CheckIfAccessible();
-            bool valid_ground = CheckValidFloor();
-            //Debug.Log(dont_overlap + " " + flat_ground + " " + accessible + " " + valid_ground);
-            return dont_overlap && flat_ground && valid_ground && accessible;
+            if (type == BuildableType.Anywhere || type == BuildableType.GridAnywhere)
+                return !CheckObstacleGround();
+            return !CheckIfOverlap() && CheckIfFlatGround() && !CheckObstacleGround();
         }
 
         //Check if overlaping another object (cant build)
         public bool CheckIfOverlap()
         {
             List<Collider> overlap_colliders = new List<Collider>();
-            LayerMask olayer = obstacle_layer & ~floor_layer;  //Remove floor layer from obstacles
+            int this_layer = 1 << gameObject.layer;
+            int layer_mask = obstacle_layer | this_layer;
 
             //Check collision with bounding box
             foreach (Collider collide in colliders) {
-                Collider[] over = Physics.OverlapBox(transform.position, collide.bounds.extents, Quaternion.identity, olayer);
+                Collider[] over = Physics.OverlapBox(transform.position, collide.bounds.extents, Quaternion.identity, layer_mask);
                 foreach (Collider overlap in over)
                 {
                     if(!overlap.isTrigger)
@@ -297,7 +238,7 @@ namespace SurvivalEngine
             //Check collision with radius (includes triggers)
             if (build_obstacle_radius > 0.01f)
             {
-                Collider[] over = Physics.OverlapSphere(transform.position, build_obstacle_radius, olayer);
+                Collider[] over = Physics.OverlapSphere(transform.position, build_obstacle_radius, layer_mask);
                 overlap_colliders.AddRange(over);
             }
 
@@ -306,10 +247,9 @@ namespace SurvivalEngine
             {
                 if (overlap != null)
                 {
-                    //Dont overlap with player and dont overlap with itself
                     PlayerCharacter player = overlap.GetComponent<PlayerCharacter>();
                     Buildable buildable = overlap.GetComponentInParent<Buildable>();
-                    if (player == null && buildable != this)
+                    if (player == null && buildable != this) //Dont overlap with player and dont overlap with itself
                         return true;
                 }
             }
@@ -317,141 +257,64 @@ namespace SurvivalEngine
             return false;
         }
 
-        //Make sure there is no obstacles in between the player and the building, this applies only if placing with keyboard/gamepad
-        public bool CheckIfAccessible()
-        {
-            PlayerControls controls = PlayerControls.Get(building_character.player_id);
-            bool game_pad = controls != null && controls.IsGamePad();
-
-            if (position_set || !game_pad)
-                return true; //Dont check this is placing with mouse or if position already set
-
-            if (building_character != null)
-            {
-                Vector3 center = building_character.GetColliderCenter();
-                Vector3 build_center = transform.position + Vector3.up * build_ground_dist;
-                Vector3 dir = build_center - center;
-
-                RaycastHit h1;
-                bool f1 = PhysicsTool.RaycastCollision(center, dir, out h1);
-
-                return !f1 || h1.collider.GetComponentInParent<Buildable>() == this;
-            }
-            return false;
-        }
-
         //Check if there is a flat floor underneath (can't build a steep cliff)
         public bool CheckIfFlatGround()
         {
-            if (!build_flat_floor)
-                return true; //Dont check for flat ground
-
             Vector3 center = transform.position + Vector3.up * build_ground_dist;
-            Vector3 p0 = center;
             Vector3 p1 = center + Vector3.right * build_obstacle_radius;
             Vector3 p2 = center + Vector3.left * build_obstacle_radius;
             Vector3 p3 = center + Vector3.forward * build_obstacle_radius;
             Vector3 p4 = center + Vector3.back * build_obstacle_radius;
             Vector3 dir = Vector3.down * (build_ground_dist + build_ground_dist);
 
-            RaycastHit h0, h1, h2, h3, h4;
-            bool f0 = PhysicsTool.RaycastCollision(p0, dir, out h0);
-            bool f1 = PhysicsTool.RaycastCollision(p1, dir, out h1);
-            bool f2 = PhysicsTool.RaycastCollision(p2, dir, out h2);
-            bool f3 = PhysicsTool.RaycastCollision(p3, dir, out h3);
-            bool f4 = PhysicsTool.RaycastCollision(p4, dir, out h4);
+            LayerMask mask = ~0; //Everything
+            RaycastHit h1, h2, h3, h4;
+            bool f1 = Physics.Raycast(p1, dir, out h1, dir.magnitude, mask, QueryTriggerInteraction.Ignore);
+            bool f2 = Physics.Raycast(p2, dir, out h2, dir.magnitude, mask, QueryTriggerInteraction.Ignore);
+            bool f3 = Physics.Raycast(p3, dir, out h3, dir.magnitude, mask, QueryTriggerInteraction.Ignore);
+            bool f4 = Physics.Raycast(p4, dir, out h4, dir.magnitude, mask, QueryTriggerInteraction.Ignore);
 
-            return f0 && f1 && f2 && f3 && f4;
+            return f1 && f2 && f3 && f4;
         }
 
-        //Check if ground is valid layer, this one check only the first hit collision (more strict)
-        public bool CheckValidFloor()
+        //Check if ground is valid layer
+        public bool CheckObstacleGround()
         {
             Vector3 center = transform.position + Vector3.up * build_ground_dist;
-            Vector3 p0 = center;
-            Vector3 p1 = center + Vector3.right * build_obstacle_radius;
-            Vector3 p2 = center + Vector3.left * build_obstacle_radius;
-            Vector3 p3 = center + Vector3.forward * build_obstacle_radius;
-            Vector3 p4 = center + Vector3.back * build_obstacle_radius;
             Vector3 dir = Vector3.down * (build_ground_dist + build_ground_dist);
-
-            RaycastHit h0, h1, h2, h3, h4;
-            bool f0 = PhysicsTool.RaycastCollision(p0, dir, out h0);
-            bool f1 = PhysicsTool.RaycastCollision(p1, dir, out h1);
-            bool f2 = PhysicsTool.RaycastCollision(p2, dir, out h2);
-            bool f3 = PhysicsTool.RaycastCollision(p3, dir, out h3);
-            bool f4 = PhysicsTool.RaycastCollision(p4, dir, out h4);
-            f0 = f0 && PhysicsTool.IsLayerInLayerMask(h0.collider.gameObject.layer, floor_layer);
-            f1 = f1 && PhysicsTool.IsLayerInLayerMask(h1.collider.gameObject.layer, floor_layer);
-            f2 = f2 && PhysicsTool.IsLayerInLayerMask(h2.collider.gameObject.layer, floor_layer);
-            f3 = f3 && PhysicsTool.IsLayerInLayerMask(h3.collider.gameObject.layer, floor_layer);
-            f4 = f4 && PhysicsTool.IsLayerInLayerMask(h4.collider.gameObject.layer, floor_layer);
-
-            if(build_flat_floor)
-                return f1 && f2 && f3 && f4 && f0; //Floor must be valid on all sides
-            else
-                return f1 || f2 || f3 || f4 || f0; //Floor must be valid only on one side
+            RaycastHit h1;
+            bool f1 = Physics.Raycast(center, dir, out h1, dir.magnitude, obstacle_layer.value, QueryTriggerInteraction.Ignore);
+            return f1 && h1.collider.GetComponentInParent<Buildable>() != this;
         }
 
-        //Check if its still valid floor after built, this one ignore itself and check only the layer (less strict)
-        public bool CheckValidFloorBuilt()
+        //Find the height of buildable (mostly for Anywhere mode) to build on top of other things
+        public Vector3 FindBuildPosition(Vector3 pos)
         {
-            Vector3 center = transform.position + Vector3.up * build_ground_dist;
-            Vector3 p0 = center;
-            Vector3 p1 = center + Vector3.right * build_obstacle_radius;
-            Vector3 p2 = center + Vector3.left * build_obstacle_radius;
-            Vector3 p3 = center + Vector3.forward * build_obstacle_radius;
-            Vector3 p4 = center + Vector3.back * build_obstacle_radius;
-            Vector3 dir = Vector3.down * (build_ground_dist + build_ground_dist);
-
-            RaycastHit h0, h1, h2, h3, h4;
-            bool f0 = PhysicsTool.RaycastCollisionLayer(p0, dir, floor_layer, out h0);
-            bool f1 = PhysicsTool.RaycastCollisionLayer(p1, dir, floor_layer, out h1);
-            bool f2 = PhysicsTool.RaycastCollisionLayer(p2, dir, floor_layer, out h2);
-            bool f3 = PhysicsTool.RaycastCollisionLayer(p3, dir, floor_layer, out h3);
-            bool f4 = PhysicsTool.RaycastCollisionLayer(p4, dir, floor_layer, out h4);
-
-            return f1 || f2 || f3 || f4 || f0;
-        }
-
-        private void FindAutoPosition()
-        {
-            if (IsGrid())
-            {
-                transform.position = FindGridPosition(transform.position);
-                transform.rotation = FindGridRotation(transform.rotation);
-            }
-
-            transform.position = FindBuildPosition(transform.position, floor_layer);
-        }
-
-        //Find the height to build
-        public Vector3 FindBuildPosition(Vector3 pos, LayerMask mask)
-        {
-            float offset = build_distance;
+            float offset = 10f;
             Vector3 center = pos + Vector3.up * offset;
-            Vector3 p0 = center;
             Vector3 p1 = center + Vector3.right * build_obstacle_radius;
             Vector3 p2 = center + Vector3.left * build_obstacle_radius;
             Vector3 p3 = center + Vector3.forward * build_obstacle_radius;
             Vector3 p4 = center + Vector3.back * build_obstacle_radius;
             Vector3 dir = Vector3.down * (offset + build_ground_dist);
 
-            RaycastHit h0, h1, h2, h3, h4;
-            bool f0 = PhysicsTool.RaycastCollisionLayer(p0, dir, mask, out h0);
-            bool f1 = PhysicsTool.RaycastCollisionLayer(p1, dir, mask, out h1);
-            bool f2 = PhysicsTool.RaycastCollisionLayer(p2, dir, mask, out h2);
-            bool f3 = PhysicsTool.RaycastCollisionLayer(p3, dir, mask, out h3);
-            bool f4 = PhysicsTool.RaycastCollisionLayer(p4, dir, mask, out h4);
+            LayerMask mask = ~0; //Everything
+            RaycastHit h1, h2, h3, h4;
+            bool f1 = Physics.Raycast(p1, dir, out h1, dir.magnitude, mask, QueryTriggerInteraction.Ignore);
+            bool f2 = Physics.Raycast(p2, dir, out h2, dir.magnitude, mask, QueryTriggerInteraction.Ignore);
+            bool f3 = Physics.Raycast(p3, dir, out h3, dir.magnitude, mask, QueryTriggerInteraction.Ignore);
+            bool f4 = Physics.Raycast(p4, dir, out h4, dir.magnitude, mask, QueryTriggerInteraction.Ignore);
 
-            Vector3 dist_dir = Vector3.down * build_distance;
-            if (f0 && h0.distance < dist_dir.magnitude) { dist_dir = Vector3.down * h0.distance; }
-            if (f1 && h1.distance < dist_dir.magnitude) { dist_dir = Vector3.down * h1.distance; }
-            if (f2 && h2.distance < dist_dir.magnitude) { dist_dir = Vector3.down * h2.distance; }
-            if (f3 && h3.distance < dist_dir.magnitude) { dist_dir = Vector3.down * h3.distance; }
-            if (f4 && h4.distance < dist_dir.magnitude) { dist_dir = Vector3.down * h4.distance; }
+            Vector3 dist_dir = Vector3.zero;
+            int nb = 0;
+            if (f1 && h1.collider.GetComponentInParent<PlayerCharacter>() == null) { dist_dir += Vector3.down * h1.distance; nb++; }
+            if (f2 && h2.collider.GetComponentInParent<PlayerCharacter>() == null) { dist_dir += Vector3.down * h2.distance; nb++; }
+            if (f3 && h3.collider.GetComponentInParent<PlayerCharacter>() == null) { dist_dir += Vector3.down * h3.distance; nb++; }
+            if (f4 && h4.collider.GetComponentInParent<PlayerCharacter>() == null) { dist_dir += Vector3.down * h4.distance; nb++; }
 
-            return center + dist_dir;
+            if (nb > 0)
+                return center + (dist_dir / nb);
+            return pos;
         }
 
         public Vector3 FindGridPosition(Vector3 pos) {
@@ -465,26 +328,9 @@ namespace SurvivalEngine
             return pos;
         }
 
-        public Quaternion FindGridRotation(Quaternion rot)
-        {
-            Vector3 euler = rot.eulerAngles;
-            float angle = Mathf.RoundToInt(euler.y / 90f) * 90f;
-            return Quaternion.Euler(euler.x, angle, euler.z);
-        }
-
         public bool IsBuilding()
         {
             return building_mode;
-        }
-
-        public bool IsPositionSet()
-        {
-            return position_set;
-        }
-
-        public bool IsGrid()
-        {
-            return type == BuildableType.Grid;
         }
 
         public Destructible GetDestructible()

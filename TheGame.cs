@@ -13,21 +13,18 @@ namespace SurvivalEngine
 
     public class TheGame : MonoBehaviour
     {
-        //non-static UnityActions only work in a game scene that uses TheGame.cs
-        public UnityAction<string> beforeSave; //Right after calling Save(), before writing the file on disk
-        public UnityAction<bool> onPause; //When pausing/unpausing the game
-        public UnityAction onStartNewGame; //After creating a new game and after the game scene has been loaded, only first time if its a new game.
-
-        //static UnityActions work in any scene (including Menu scenes that don't have TheGame.cs)
-        public static UnityAction afterLoad; //Right after calling Load(), after loading the PlayerData but before changing scene
-        public static UnityAction afterNewGame; //Right after calling NewGame(), after creating the PlayerData but before changing scene
-        public static UnityAction<string> beforeChangeScene; //Right before changing scene (for any reason)
+        [Header("Loader")]
+        public GameObject ui_canvas;
+        public GameObject ui_canvas_mobile;
+        public GameObject audio_manager;
+        public GameObject action_selector;
 
         private bool paused = false;
         private bool paused_by_player = false;
         private float death_timer = 0f;
         private float speed_multiplier = 1f;
-        private bool scene_transition = false;
+
+        public UnityAction<bool> onPause;
 
         private static TheGame _instance;
 
@@ -35,108 +32,82 @@ namespace SurvivalEngine
         {
             _instance = this;
             PlayerData.LoadLast();
+
+            //Load managers
+            if (!FindObjectOfType<TheUI>())
+                Instantiate(IsMobile() ? ui_canvas_mobile : ui_canvas);
+            if (!FindObjectOfType<TheAudio>())
+                Instantiate(audio_manager);
+            if (!FindObjectOfType<ActionSelector>())
+                Instantiate(action_selector);
+
         }
 
         private void Start()
         {
+            //Load game data
             PlayerData pdata = PlayerData.Get();
-            GameObject spawn_parent = new GameObject("SaveFileSpawns");
-            string scene = SceneNav.GetCurrentScene();
+            GameData gdata = GameData.Get();
+            if (!string.IsNullOrEmpty(pdata.current_scene) && pdata.current_scene == SceneNav.GetCurrentScene())
+            {
+                //Entry index: -1 = go to saved pos, 0=dont change character pos, 1+ = go to entry index
+                if (pdata.current_entry_index < 0)
+                {
+                    PlayerCharacter.Get().transform.position = pdata.current_pos;
+                    TheCamera.Get().MoveToTarget(pdata.current_pos);
+                }
 
-            //Spawn constructions (do this first because they may be big, have colliders, entry zones that affect the player)
+                if (pdata.current_entry_index > 0)
+                {
+                    ExitZone zone = ExitZone.GetIndex(pdata.current_entry_index);
+                    if (zone != null)
+                    {
+                        Vector3 pos = zone.transform.position + zone.entry_offset;
+                        Vector3 dir = new Vector3(zone.entry_offset.x, 0f, zone.entry_offset.z);
+                        PlayerCharacter.Get().transform.position = pos;
+                        if(dir.magnitude > 0.1f)
+                            PlayerCharacter.Get().transform.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
+                        TheCamera.Get().MoveToTarget(pos);
+                    }
+                }
+            }
+
+            pdata.current_scene = SceneNav.GetCurrentScene();
+
+            GameObject spawn_parent = new GameObject("SaveFileSpawns");
+
+            //Spawn dropped items
+            foreach (KeyValuePair<string, DroppedItemData> elem in pdata.dropped_items)
+            {
+                if (elem.Value.scene == SceneNav.GetCurrentScene() && Item.GetByUID(elem.Key) == null)
+                    Item.Spawn(elem.Key, spawn_parent.transform);
+            }
+
+            //Spawn constructions
             foreach (KeyValuePair<string, BuiltConstructionData> elem in pdata.built_constructions)
             {
-                Construction.Spawn(elem.Key, spawn_parent.transform);
-            }
-
-            //Set player and camera position
-            if (!string.IsNullOrEmpty(pdata.current_scene) && pdata.current_scene == scene)
-            {
-                foreach (PlayerCharacter player in PlayerCharacter.GetAll())
-                {
-                    //Entry index: -1 = go to saved pos, 0=dont change character pos, 1+ = go to entry index
-
-                    //Saved position
-                    if (pdata.current_entry_index < 0)
-                    {
-                        player.transform.position = player.Data.position;
-                        TheCamera.Get().MoveToTarget(player.Data.position);
-                    }
-
-                    //Entry index
-                    if (pdata.current_entry_index > 0)
-                    {
-                        ExitZone zone = ExitZone.GetIndex(pdata.current_entry_index);
-                        if (zone != null)
-                        {
-                            Vector3 pos = zone.transform.position + zone.entry_offset;
-                            Vector3 dir = new Vector3(zone.entry_offset.x, 0f, zone.entry_offset.z);
-                            player.transform.position = pos;
-                            if (dir.magnitude > 0.1f)
-                            {
-                                player.transform.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
-                                player.FaceTorward(transform.position + dir.normalized);
-                            }
-                            TheCamera.Get().MoveToTarget(pos);
-                        }
-                    }
-
-                    //Update saved pos
-                    player.Data.position = player.transform.position;
-                }
-            }
-
-            //Update pet position (do this before spawning characters)
-            foreach (PlayerCharacter player in PlayerCharacter.GetAll())
-            {
-                foreach (KeyValuePair<string, PlayerPetData> pet_pair in player.Data.pets)
-                {
-                    float radius = 1f;
-                    float angle = Random.Range(0f, 360f);
-                    Vector3 pos = player.transform.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
-                    PlayerData.Get().SetCharacterPosition(pet_pair.Key, scene, pos, player.transform.rotation);
-                }
-            }
-
-            //Spawn characters
-            foreach (KeyValuePair<string, TrainedCharacterData> elem in pdata.trained_characters)
-            {
-                Character.Spawn(elem.Key, spawn_parent.transform);
+                if (elem.Value.scene == SceneNav.GetCurrentScene() && Construction.GetByUID(elem.Key) == null)
+                    Construction.Spawn(elem.Key, spawn_parent.transform);
             }
 
             //Spawn plants
             foreach (KeyValuePair<string, SowedPlantData> elem in pdata.sowed_plants)
             {
-                Plant.Spawn(elem.Key, spawn_parent.transform);
+                if (elem.Value.scene == SceneNav.GetCurrentScene() && Plant.GetByUID(elem.Key) == null)
+                    Plant.Spawn(elem.Key, spawn_parent.transform);
             }
 
-            //Spawn others
-            foreach (KeyValuePair<string, SpawnedData> elem in pdata.spawned_objects)
+            //Spawn characters
+            foreach (KeyValuePair<string, TrainedCharacterData> elem in pdata.trained_characters)
             {
-                Spawnable.Spawn(elem.Key, spawn_parent.transform);
+                if (elem.Value.scene == SceneNav.GetCurrentScene() && Character.GetByUID(elem.Key) == null)
+                    Character.Spawn(elem.Key, spawn_parent.transform);
             }
 
-            //Spawn dropped items
-            foreach (KeyValuePair<string, DroppedItemData> elem in pdata.dropped_items)
-            {
-                Item.Spawn(elem.Key, spawn_parent.transform);
-            }
-
-            //Set current scene
-            pdata.current_scene = scene;
-
-            //Black panel transition
             if (!BlackPanel.Get().IsVisible())
             {
                 BlackPanel.Get().Show(true);
                 BlackPanel.Get().Hide();
-            }
-
-            //New game
-            if (pdata.IsNewGame())
-            {
-                pdata.play_time = 0.01f; //Initialize play time to 0.01f to make sure onStartNewGame never get called again
-                onStartNewGame?.Invoke(); //New Game!
             }
         }
 
@@ -146,8 +117,8 @@ namespace SurvivalEngine
                 return;
 
             //Check if dead
-            PlayerCharacter character = PlayerCharacter.GetFirst();
-            if (character && character.IsDead())
+            PlayerCharacter character = PlayerCharacter.Get();
+            if (character.IsDead())
             {
                 death_timer += Time.deltaTime;
                 if (death_timer > 2f)
@@ -167,9 +138,6 @@ namespace SurvivalEngine
                 pdata.day++; //New day
             }
 
-            //Play time
-            pdata.play_time += Time.deltaTime;
-
             //Set music
             AudioClip[] music_playlist = GameData.Get().music_playlist;
             if (music_playlist.Length > 0 && !TheAudio.Get().IsMusicPlaying("music"))
@@ -187,7 +155,57 @@ namespace SurvivalEngine
             PlayerData pdata = PlayerData.Get();
             float game_speed = GetGameTimeSpeedPerSec();
 
+            List<int> remove_items = new List<int>();
             List<string> remove_items_uid = new List<string>();
+
+            //Inventory
+            foreach (KeyValuePair<int, InventoryItemData> pair in pdata.inventory)
+            {
+                InventoryItemData invdata = pair.Value;
+                ItemData idata = ItemData.Get(invdata?.item_id);
+
+                if (idata != null && invdata != null && idata.durability_type == DurabilityType.Spoilage)
+                {
+                    invdata.durability -= game_speed * Time.deltaTime;
+                }
+
+                if (idata != null && invdata != null && idata.HasDurability() && invdata.durability <= 0f)
+                    remove_items.Add(pair.Key);
+            }
+
+            foreach (int slot in remove_items)
+            {
+                InventoryItemData invdata = pdata.GetItemSlot(slot);
+                ItemData idata = ItemData.Get(invdata?.item_id);
+                pdata.RemoveItemAt(slot, invdata.quantity);
+                if (idata.container_data)
+                    pdata.AddItemAt(idata.container_data.id, slot, invdata.quantity, idata.container_data.durability);
+            }
+            remove_items.Clear();
+
+            //Equipped
+            foreach (KeyValuePair<int, InventoryItemData> pair in pdata.equipped_items)
+            {
+                ItemData idata = ItemData.Get(pair.Value?.item_id);
+                InventoryItemData invdata = pair.Value;
+                if (idata != null && invdata != null && (idata.durability_type == DurabilityType.Spoilage || idata.durability_type == DurabilityType.UsageTime))
+                {
+                    invdata.durability -= game_speed * Time.deltaTime;
+                }
+
+                if (idata != null && invdata != null && idata.HasDurability() && invdata.durability <= 0f)
+                    remove_items.Add(pair.Key);
+            }
+
+            foreach (int slot in remove_items)
+            {
+                InventoryItemData invdata = pdata.GetEquippedItemSlot(slot);
+                ItemData idata = ItemData.Get(invdata?.item_id);
+                pdata.UnequipItem(slot);
+                if (idata.container_data)
+                    pdata.EquipItem(slot, idata.container_data.id, idata.container_data.durability);
+            }
+            remove_items.Clear();
 
             //Dropped
             foreach (KeyValuePair<string, DroppedItemData> pair in pdata.dropped_items)
@@ -212,12 +230,34 @@ namespace SurvivalEngine
             }
             remove_items_uid.Clear();
 
-            //Inventory
-            foreach (KeyValuePair<string, InventoryData> spair in pdata.inventories)
+            //Stored
+            foreach (KeyValuePair<string, StoredItemData> spair in pdata.stored_items)
             {
                 if (spair.Value != null)
                 {
-                    spair.Value.UpdateAllDurability(game_speed);
+                    foreach (KeyValuePair<int, InventoryItemData> pair in spair.Value.items)
+                    {
+                        InventoryItemData invdata = pair.Value;
+                        ItemData idata = ItemData.Get(invdata?.item_id);
+
+                        if (idata != null && invdata != null && idata.durability_type == DurabilityType.Spoilage)
+                        {
+                            invdata.durability -= game_speed * Time.deltaTime;
+                        }
+
+                        if (idata != null && invdata != null && idata.HasDurability() && invdata.durability <= 0f)
+                            remove_items.Add(pair.Key);
+                    }
+
+                    foreach (int slot in remove_items)
+                    {
+                        InventoryItemData invdata = pdata.GetStoredItemSlot(spair.Value, slot);
+                        ItemData idata = ItemData.Get(invdata?.item_id);
+                        pdata.RemoveStoredItemAt(spair.Key, slot, invdata.quantity);
+                        if (idata.container_data)
+                            pdata.AddStoredItemAt(spair.Key, idata.container_data.id, slot, invdata.quantity, idata.container_data.durability);
+                    }
+                    remove_items.Clear();
                 }
             }
 
@@ -245,52 +285,25 @@ namespace SurvivalEngine
             remove_items_uid.Clear();
 
             //Timed bonus
-            foreach (KeyValuePair <int, PlayerCharacterData> pcdata in PlayerData.Get().player_characters)
+            List<BonusType> remove_bonus_list = new List<BonusType>();
+            foreach (KeyValuePair<BonusType, TimedBonusData> pair in pdata.timed_bonus_effects)
             {
-                List<BonusType> remove_bonus_list = new List<BonusType>();
-                foreach (KeyValuePair<BonusType, TimedBonusData> pair in pcdata.Value.timed_bonus_effects)
-                {
-                    TimedBonusData bdata = pair.Value;
-                    bdata.time -= game_speed * Time.deltaTime;
-
-                    if (bdata.time <= 0f)
-                        remove_bonus_list.Add(pair.Key);
-                }
-                foreach (BonusType bonus in remove_bonus_list)
-                    pcdata.Value.RemoveTimedBonus(bonus);
-                remove_bonus_list.Clear();
-            }
-
-            //World regrowth
-            List<RegrowthData> spawn_growth_list = new List<RegrowthData>();
-            foreach (KeyValuePair<string, RegrowthData> pair in PlayerData.Get().world_regrowth)
-            {
-                RegrowthData bdata = pair.Value;
+                TimedBonusData bdata = pair.Value;
                 bdata.time -= game_speed * Time.deltaTime;
 
-                if (bdata.time <= 0f && bdata.scene == SceneNav.GetCurrentScene())
-                    spawn_growth_list.Add(pair.Value);
+                if (bdata.time <= 0f)
+                    remove_bonus_list.Add(pair.Key);
             }
+            foreach (BonusType bonus in remove_bonus_list)
+                PlayerData.Get().RemoveTimedBonus(bonus);
+            remove_bonus_list.Clear();
 
-            foreach (RegrowthData regrowth in spawn_growth_list)
-            {
-                Regrowth.SpawnRegrowth(regrowth);
-                PlayerData.Get().RemoveWorldRegrowth(regrowth.uid);
-            }
-            spawn_growth_list.Clear();
         }
 
         public bool IsNight()
         {
             PlayerData pdata = PlayerData.Get();
             return pdata.day_time >= 18f || pdata.day_time < 6f;
-        }
-
-        public bool IsWeather(WeatherEffect effect)
-        {
-            if (WeatherSystem.Get() != null)
-                return WeatherSystem.Get().HasWeatherEffect(effect);
-            return false;
         }
 
         //Set to 1f for default speed
@@ -313,7 +326,13 @@ namespace SurvivalEngine
             return hour_to_sec;
         }
 
-        //---- Pause / Unpause -----
+        public void Save()
+        {
+            PlayerData.Get().current_scene = SceneNav.GetCurrentScene();
+            PlayerData.Get().current_pos = PlayerCharacter.Get().transform.position;
+            PlayerData.Get().current_entry_index = -1; //Go to current_pos
+            PlayerData.Get().Save();
+        }
 
         public void Pause()
         {
@@ -353,132 +372,12 @@ namespace SurvivalEngine
             return paused_by_player;
         }
 
-        public bool IsPausedByGameplay()
-        {
-            return paused && !paused_by_player;
-        }
-
-        //-- Scene transition -----
-
-        public void TransitionToScene(string scene, int entry_index)
-        {
-            if (!scene_transition)
-            {
-                if (SceneNav.DoSceneExist(scene))
-                {
-                    scene_transition = true;
-                    StartCoroutine(GoToSceneRoutine(scene, entry_index));
-                }
-                else
-                {
-                    Debug.Log("Scene don't exist: " + scene);
-                }
-            }
-        }
-
-        private IEnumerator GoToSceneRoutine(string scene, int entry_index)
-        {
-            BlackPanel.Get().Show();
-            yield return new WaitForSeconds(1f);
-            TheGame.GoToScene(scene, entry_index);
-        }
-
-        public static void GoToScene(string scene, int entry_index = 0)
-        {
-            if (!string.IsNullOrEmpty(scene)) {
-
-                PlayerData pdata = PlayerData.Get();
-                if (pdata != null)
-                {
-                    pdata.current_scene = scene;
-                    pdata.current_entry_index = entry_index;
-                }
-
-                if (beforeChangeScene != null)
-                    beforeChangeScene.Invoke(scene);
-
-                SceneNav.GoTo(scene);
-            }
-        }
-
-        //---- Load / Save -----
-
-        //Save is not static, because a scene and save file must be loaded before you can save
-        public void Save()
-        {
-            Save(PlayerData.Get().filename);
-        }
-
-        public bool Save(string filename)
-        {
-            if (!SaveSystem.IsValidFilename(filename))
-                return false; //Failed
-
-            foreach (PlayerCharacter player in PlayerCharacter.GetAll())
-                player.Data.position = player.transform.position;
-
-            PlayerData.Get().current_scene = SceneNav.GetCurrentScene();
-            PlayerData.Get().current_entry_index = -1; //Go to saved current_pos instead of scene position
-
-            if (beforeSave != null)
-                beforeSave.Invoke(filename);
-
-            PlayerData.Save(filename, PlayerData.Get());
-            return true;
-        }
-
-        public static void Load()
-        {
-            Load(PlayerData.GetLastSave());
-        }
-
-        public static bool Load(string filename)
-        {
-            if (!SaveSystem.IsValidFilename(filename))
-                return false; //Failed
-
-            PlayerData.Unload(); //Make sure to unload first, or it won't load if already loaded
-            PlayerData.AutoLoad(filename);
-
-            if (afterLoad != null)
-                afterLoad.Invoke();
-
-            SceneNav.GoTo(PlayerData.Get().current_scene);
-            return true;
-        }
-
-        public static void NewGame()
-        {
-            NewGame(PlayerData.GetLastSave(), SceneNav.GetCurrentScene());
-        }
-
-        public static bool NewGame(string filename, string scene)
-        {
-            if (!SaveSystem.IsValidFilename(filename))
-                return false; //Failed
-
-            PlayerData.NewGame(filename);
-
-            if (afterNewGame != null)
-                afterNewGame.Invoke();
-
-            SceneNav.GoTo(scene);
-            return true;
-        }
-
-        public static void DeleteGame(string filename)
-        {
-            PlayerData.Delete(filename);
-        }
-
-        //---------
-
         public static bool IsMobile()
         {
-#if UNITY_ANDROID || UNITY_IOS || UNITY_TIZEN
-            return true;
+#if UNITY_ANDROID || UNITY_IOS
+        return true;
 #elif UNITY_WEBGL
-            return WebGLTool.isMobile();
+        return WebGLTool.isMobile();
 #else
             return false;
 #endif
@@ -486,8 +385,6 @@ namespace SurvivalEngine
 
         public static TheGame Get()
         {
-            if (_instance == null)
-                _instance = FindObjectOfType<TheGame>();
             return _instance;
         }
     }

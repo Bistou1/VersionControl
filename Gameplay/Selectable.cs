@@ -5,14 +5,6 @@ using UnityEngine.Events;
 
 namespace SurvivalEngine
 {
-    public enum SelectableType
-    {
-        Interact=0, //Interacts at the pivot position of the object (transform position)
-        InteractBound=5, //When its set to Bound, will interest with the nearest position in the collider's bounding box
-        InteractSurface=10, //When it's a surface, can be interacted with at different position among the surface, instead of just the center
-        CantInteract =20, //Can be clicked on/hovered, but cant interact
-        CantSelect=30, //Cannot be clicked on or hovered
-    }
 
     /// <summary>
     /// Anything the player can interact with is a Selectable
@@ -24,8 +16,8 @@ namespace SurvivalEngine
 
     public class Selectable : MonoBehaviour
     {
-        public SelectableType type; 
         public float use_range = 2f;
+        public bool surface; //When it's a surface, can be interacted with at different position among the surface, instead of just the center
 
         [Header("Action")]
         public SAction[] actions;
@@ -49,9 +41,7 @@ namespace SurvivalEngine
         public UnityAction<PlayerCharacter> onUse; //After clicked, when character reaches use distance, or when using action button while nearby
         public UnityAction onDestroy;
 
-        private Collider[] colliders;
-        private Destructible destruct; //May be null, not all selectables have one, so check if null first (quick access for optimization)
-        private Character character; //May be null, not all selectables have one, so check if null first (quick access for optimization)
+        private Destructible destruct; //May be null, not all selectables have one, so check if null first
         private UniqueID unique_id; //May be null,  not all selectables have one, so check if null first
         private Transform transf; //Quick access to last position
         private bool is_hovered = false;
@@ -68,9 +58,7 @@ namespace SurvivalEngine
         void Awake()
         {
             destruct = GetComponent<Destructible>();
-            character = GetComponent<Character>();
             unique_id = GetComponent<UniqueID>();
-            colliders = GetComponentsInChildren<Collider>();
             selectable_list.Add(this);
             active_list.Add(this);
             transf = transform;
@@ -90,12 +78,12 @@ namespace SurvivalEngine
         {
             GenerateAutomaticOutline();
 
-            if ((TheGame.IsMobile() || PlayerControls.IsAnyGamePad()) && groups.Length > 0 && AssetData.Get().item_merge_fx != null)
+            if (TheGame.IsMobile() && groups.Length > 0 && GameData.Get().item_merge_fx != null)
             {
                 if (fx_parent == null)
                     fx_parent = new GameObject("FX");
 
-                GameObject fx = Instantiate(AssetData.Get().item_merge_fx, transform.position, AssetData.Get().item_merge_fx.transform.rotation);
+                GameObject fx = Instantiate(GameData.Get().item_merge_fx, transform.position, GameData.Get().item_merge_fx.transform.rotation);
                 fx.GetComponent<ItemMergeFX>().target = this;
                 fx.transform.SetParent(fx_parent.transform);
             }
@@ -109,7 +97,7 @@ namespace SurvivalEngine
                     outline.SetActive(is_hovered);
             }
 
-            is_hovered = PlayerControlsMouse.Get().IsInRaycast(this);
+            is_hovered = !PlayerCharacter.Get().IsBuildMode() && PlayerControlsMouse.Get().IsInRaycast(gameObject);
         }
 
         private void GenerateAutomaticOutline()
@@ -123,10 +111,6 @@ namespace SurvivalEngine
                     GameObject new_outline = Instantiate(render.gameObject, render.transform.position, render.transform.rotation);
                     new_outline.name = "OutlineMesh";
                     new_outline.transform.localScale = render.transform.lossyScale; //Preserve scale from parents
-
-                    foreach (MonoBehaviour script in new_outline.GetComponents<MonoBehaviour>())
-                        script.enabled = false; //Disable scripts
-
                     MeshRenderer out_render = new_outline.GetComponent<MeshRenderer>();
                     Material[] mats = new Material[out_render.sharedMaterials.Length];
                     for (int i = 0; i < mats.Length; i++)
@@ -159,14 +143,15 @@ namespace SurvivalEngine
         {
             if (enabled)
             {
-                PlayerUI ui = PlayerUI.Get(character.player_id);
-                ItemSlot slot = ui != null ? ui.GetSelectedSlot() : null;
+                ItemSlot islot = InventoryBar.Get().GetSelectedSlot();
+                ItemSlot eslot = EquipBar.Get().GetSelectedSlot();
+                ItemSlot slot = eslot != null ? eslot : islot;
                 MAction maction = slot != null && slot.GetItem() != null ? slot.GetItem().FindMergeAction(this) : null;
                 AAction aaction = FindAutoAction(character);
-                if (maction != null && maction.CanDoAction(character, slot, this))
+                if (maction != null && maction.CanDoAction(character, this))
                 {
                     maction.DoAction(character, slot, this);
-                    PlayerUI.Get(character.player_id)?.CancelSelection();
+                    TheUI.Get().CancelSelection();
                 }
                 else if (aaction != null && aaction.CanDoAction(character, this))
                 {
@@ -174,7 +159,7 @@ namespace SurvivalEngine
                 }
                 else if (actions.Length > 0)
                 {
-                    ActionSelector.Get(character.player_id)?.Show(character, this, pos);
+                    ActionSelector.Get().Show(character, this, pos);
                 }
 
                 if (onUse != null)
@@ -214,7 +199,7 @@ namespace SurvivalEngine
         {
             foreach (SAction action in actions)
             {
-                if (action != null && action is AAction)
+                if (action is AAction)
                 {
                     AAction aaction = (AAction)action;
                     if (aaction.CanDoAction(character, this))
@@ -257,22 +242,9 @@ namespace SurvivalEngine
             return is_active || always_run_scripts;
         }
 
-        //Player can interact with it by clicking on it, such as using actions
-        public bool CanBeClicked()
+        public bool CanInteractWith()
         {
-            return is_active && enabled && type != SelectableType.CantSelect;
-        }
-
-        //Player can interact with it by clicking on it, such as using actions
-        public bool CanBeInteracted()
-        {
-            return is_active && enabled && type != SelectableType.CantInteract && type != SelectableType.CantSelect;
-        }
-
-        //Player can interact automatically with this
-        public bool CanAutoInteract()
-        {
-            return CanBeInteracted() && (onUse != null || actions.Length > 0);
+            return onUse != null || actions.Length > 0;
         }
 
         public void AddGroup(GroupData group)
@@ -310,61 +282,15 @@ namespace SurvivalEngine
             return false;
         }
 
-        public bool IsInUseRange(Vector3 pos)
-        {
-            Vector3 select_pos = GetClosestInteractPoint(pos);
-            float dist = (select_pos - pos).magnitude;
-            return dist <= use_range;
-        }
-
         public bool IsNearCamera(float distance)
         {
-            float dist = (transf.position - TheCamera.Get().GetTargetPos()).magnitude;
+            float dist = (transform.position - TheCamera.Get().GetTargetPos()).magnitude;
             return dist < distance;
-        }
-
-        public Vector3 GetClosestInteractPoint(Vector3 pos)
-        {
-            if (type == SelectableType.InteractBound || type == SelectableType.InteractSurface)
-                return GetClosestPoint(pos);
-            return transf.position; //If not surface, always interact from center
-        }
-
-        public Vector3 GetClosestInteractPoint(Vector3 pos, Vector3 click_pos)
-        {
-            if (type == SelectableType.InteractBound)
-                return GetClosestPoint(pos);
-            if (type == SelectableType.InteractSurface)
-                return click_pos; //If surface, interact where you clicked
-            return transf.position; //If not surface, always interact from center
-        }
-
-        public Vector3 GetClosestPoint(Vector3 pos) 
-        {
-            //A bit slow dont run every frame
-            Vector3 nearest = transf.position;
-            float min_dist = (transf.position - pos).magnitude;
-            foreach (Collider collide in colliders)
-            {
-                Vector3 npos = collide.bounds.ClosestPoint(pos);
-                float dist = (npos - pos).magnitude;
-                if (dist < min_dist)
-                {
-                    min_dist = dist;
-                    nearest = npos;
-                }
-            }
-            return nearest;
         }
 
         public Destructible GetDestructible()
         {
             return destruct; //May be null, beware!
-        }
-
-        public Character GetCharacter()
-        {
-            return character; //May be null, beware!
         }
 
         public string GetUID()
@@ -383,8 +309,48 @@ namespace SurvivalEngine
             {
                 if (select.enabled && select.gameObject.activeSelf)
                 {
-                    float dist = (select.transf.position - pos).magnitude;
+                    float dist = (select.transform.position - pos).magnitude;
                     if (dist < min_dist)
+                    {
+                        min_dist = dist;
+                        nearest = select;
+                    }
+                }
+            }
+            return nearest;
+        }
+
+        //Get nearest active selectable that can be interacted with
+        public static Selectable GetNearestInteractable(Vector3 pos, float range = 999f)
+        {
+            Selectable nearest = null;
+            float min_dist = range;
+            foreach (Selectable select in active_list)
+            {
+                if (select.enabled && select.gameObject.activeSelf && select.CanInteractWith())
+                {
+                    float dist = (select.transform.position - pos).magnitude;
+                    if (dist < min_dist)
+                    {
+                        min_dist = dist;
+                        nearest = select;
+                    }
+                }
+            }
+            return nearest;
+        }
+
+        //Get nearest active selectable in use range
+        public static Selectable GetNearestUseRange(Vector3 pos, float range = 999f)
+        {
+            Selectable nearest = null;
+            float min_dist = range;
+            foreach (Selectable select in active_list)
+            {
+                if (select.enabled && select.gameObject.activeSelf)
+                {
+                    float dist = (select.transform.position - pos).magnitude;
+                    if (dist < min_dist && dist < select.use_range)
                     {
                         min_dist = dist;
                         nearest = select;
@@ -403,28 +369,7 @@ namespace SurvivalEngine
             {
                 if (select.enabled && select.gameObject.activeSelf && select.IsHovered())
                 {
-                    float dist = (select.transf.position - pos).magnitude;
-                    if (dist < min_dist)
-                    {
-                        min_dist = dist;
-                        nearest = select;
-                    }
-                }
-            }
-            return nearest;
-        }
-
-        //Get nearest active selectable that can be interacted with
-        public static Selectable GetNearestAutoInteract(Vector3 pos, float range = 999f)
-        {
-            Selectable nearest = null;
-            float min_dist = range;
-            foreach (Selectable select in active_list)
-            {
-                if (select.enabled && select.gameObject.activeSelf && select.CanAutoInteract())
-                {
-                    float offset = select.type == SelectableType.InteractSurface ? 2f : 0f; //Prioritize not surface by 2f
-                    float dist = (select.GetClosestInteractPoint(pos) - pos).magnitude + offset;
+                    float dist = (select.transform.position - pos).magnitude;
                     if (dist < min_dist)
                     {
                         min_dist = dist;
@@ -444,8 +389,7 @@ namespace SurvivalEngine
             {
                 if (select.enabled && select.gameObject.activeSelf && select.HasGroup(group))
                 {
-                    float offset = select.type == SelectableType.InteractSurface ? 1f : 0f; //Prioritize not surface by 1f
-                    float dist = (select.GetClosestInteractPoint(pos) - pos).magnitude + offset;
+                    float dist = (select.transform.position - pos).magnitude;
                     if (dist < min_dist)
                     {
                         min_dist = dist;
@@ -465,8 +409,7 @@ namespace SurvivalEngine
             {
                 if (select.enabled && select.gameObject.activeSelf && select.HasGroup(groups))
                 {
-                    float offset = select.type == SelectableType.InteractSurface ? 1f : 0f; //Prioritize not surface by 1f
-                    float dist = (select.GetClosestInteractPoint(pos) - pos).magnitude + offset;
+                    float dist = (select.transform.position - pos).magnitude;
                     if (dist < min_dist)
                     {
                         min_dist = dist;

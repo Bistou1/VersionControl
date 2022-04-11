@@ -9,49 +9,41 @@ namespace SurvivalEngine
     /// ActionSelector is the panel that popup and allow you to pick an action to do when you click on a selectable
     /// </summary>
 
-    public class ActionSelector : UISlotPanel
+    public class ActionSelector : MonoBehaviour
     {
+        public ActionSelectorButton[] buttons;
+
         private Animator animator;
+        private bool visible = false;
 
         private PlayerCharacter character;
         private Selectable select;
         private Vector3 interact_pos;
 
-        private static List<ActionSelector> selector_list = new List<ActionSelector>();
+        private static ActionSelector _instance;
 
-        protected override void Awake()
+        void Awake()
         {
-            base.Awake();
-
-            selector_list.Add(this);
+            _instance = this;
             animator = GetComponent<Animator>();
             gameObject.SetActive(false);
+
+            foreach (ActionSelectorButton button in buttons)
+            {
+                button.onClick += OnClickAction;
+            }
         }
 
-        protected override void OnDestroy()
+        private void Start()
         {
-            base.OnDestroy();
-            selector_list.Remove(this);
-        }
-
-        protected override void Start()
-        {
-            base.Start();
-
             //PlayerControlsMouse.Get().onClick += OnMouseClick;
             PlayerControlsMouse.Get().onRightClick += OnMouseClick;
 
-            onClickSlot += OnClick;
-            onPressAccept += OnAccept;
-            onPressCancel += OnCancel;
-            onPressUse += OnCancel;
         }
 
-        protected override void Update()
+        void Update()
         {
-            base.Update();
-
-            if (IsVisible() && character != null && select != null)
+            if (visible && character != null && select != null)
             {
                 float dist = (interact_pos - character.transform.position).magnitude;
                 if (dist > select.use_range * 1.2f)
@@ -60,24 +52,19 @@ namespace SurvivalEngine
                 }
             }
 
-            if (IsVisible())
+            if (visible)
             {
                 Vector3 dir = TheCamera.Get().GetFacingFront();
                 transform.rotation = Quaternion.LookRotation(dir, Vector3.up);
             }
 
-            if (IsVisible() && select == null)
+            if (visible && select == null)
                 Hide();
-
-            //Auto focus
-            UISlotPanel focus_panel = UISlotPanel.GetFocusedPanel();
-            if (focus_panel != this && IsVisible() && PlayerControls.IsAnyGamePad())
-                Focus();
         }
 
-        private void RefreshSelector()
+        private void RefreshPanel()
         {
-            foreach (ActionSelectorButton button in slots)
+            foreach (ActionSelectorButton button in buttons)
                 button.Hide();
 
             if (select != null)
@@ -85,9 +72,9 @@ namespace SurvivalEngine
                 int index = 0;
                 foreach (SAction action in select.actions)
                 {
-                    if (index < slots.Length && !action.IsAuto() && action.CanDoAction(character, select))
+                    if (index < buttons.Length && action.CanDoAction(character, select))
                     {
-                        ActionSelectorButton button = (ActionSelectorButton) slots[index];
+                        ActionSelectorButton button = buttons[index];
                         button.SetButton(action);
                         index++;
                     }
@@ -99,52 +86,42 @@ namespace SurvivalEngine
         {
             if (select != null && character != null)
             {
-                if (!IsVisible() || this.select != select || this.character != character)
+                if (!visible || this.select != select || this.character != character)
                 {
                     this.select = select;
                     this.character = character;
-                    RefreshSelector();
+                    visible = true;
+                    RefreshPanel();
                     animator.Rebind();
                     //animator.SetTrigger("Show");
                     transform.position = pos;
                     interact_pos = pos;
                     gameObject.SetActive(true);
-                    selection_index = 0;
-                    Show();
                 }
             }
         }
 
-        public override void Hide(bool instant = false)
+        public void Hide()
         {
-            if (IsVisible())
+            if (visible)
             {
-                base.Hide(instant);
                 select = null;
                 character = null;
+                visible = false;
                 animator.SetTrigger("Hide");
+                Invoke("AfterHide", 1f);
             }
         }
 
-        private void OnClick(UISlot islot)
+        private void AfterHide()
         {
-            ActionSelectorButton button = (ActionSelectorButton)islot;
-            OnClickAction(button.GetAction());
-        }
-
-        private void OnAccept(UISlot slot)
-        {
-            OnClick(slot);
-            UISlotPanel.UnfocusAll();
-        }
-
-        private void OnCancel(UISlot slot) {
-            Hide();
+            if (!visible)
+                gameObject.SetActive(false);
         }
 
         public void OnClickAction(SAction action)
         {
-            if (IsVisible())
+            if (visible)
             {
                 if (action != null && select != null && character != null)
                 {
@@ -168,29 +145,14 @@ namespace SurvivalEngine
             return select;
         }
 
-        public PlayerCharacter GetPlayer()
+        public bool IsVisible()
         {
-            return character;
+            return visible;
         }
 
-        public static ActionSelector Get(int player_id=0)
+        public static ActionSelector Get()
         {
-            foreach (ActionSelector panel in selector_list)
-            {
-                if (panel.character == null)
-                {
-                    panel.character = PlayerCharacter.Get(player_id); //Assign character
-                }
-
-                if (panel.character != null && panel.character.player_id == player_id)
-                    return panel;
-            }
-            return null;
-        }
-
-        public static new List<ActionSelector> GetAll()
-        {
-            return selector_list;
+            return _instance;
         }
     }
 

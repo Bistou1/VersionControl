@@ -13,7 +13,7 @@ namespace SurvivalEngine
     [RequireComponent(typeof(Selectable))]
     [RequireComponent(typeof(Destructible))]
     [RequireComponent(typeof(UniqueID))]
-    public class Character : Craftable
+    public class Character : MonoBehaviour
     {
         [Header("Character")]
         public CharacterData data;
@@ -22,17 +22,14 @@ namespace SurvivalEngine
         public bool move_enabled = true;
         public float move_speed = 2f;
         public float rotate_speed = 250f;
-        public float moving_threshold = 0.15f; //Move threshold is how fast the character need to move before its considered movement (triggering animations, etc)
-        public bool avoid_obstacles = true; //More performant alternative to navmesh, will raycast to see if there are obstacles in front, then move around them
-        public bool use_navmesh = false; //Use the real unity navmesh
+        public bool avoid_obstacles = true;
+        public bool use_navmesh = false;
 
         [Header("Ground/Falling")]
         public float fall_speed = 20f;
-        public float slope_angle_max = 45f; //Maximum angle, in degrees that the character can climb up
-        public float ground_detect_dist = 0.1f; //Margin distance between the character and the ground, used to detect if character is grounded.
-        public LayerMask ground_layer = ~0; //What is considered ground?
-        public float ground_refresh_rate = 0.2f; //Refresh rate for ground detection, higher value for performance, lower for accuracy, 0 = every frame
-        
+        public float ground_detect_dist = 0.1f;
+        public LayerMask ground_layer = ~0;
+
         [Header("Attack")]
         public bool attack_enabled = true;
         public int attack_damage = 10;
@@ -55,13 +52,12 @@ namespace SurvivalEngine
         private Rigidbody rigid;
         private Selectable selectable;
         private Destructible destruct;
-        private Buildable buildable; //Can be null
         private UniqueID unique_id;
         private Collider[] colliders;
         private Vector3 bounds_extent;
         private Vector3 bounds_center_offset;
-        private string current_scene;
 
+        private Vector3 start_pos;
         private Vector3 moving;
         private Vector3 facing;
 
@@ -69,18 +65,14 @@ namespace SurvivalEngine
         private Destructible attack_target = null;
         private PlayerCharacter attack_player = null;
         private Vector3 move_target;
-        private Vector3 move_target_avoid;
-        private Vector3 move_average;
-        private Vector3 prev_pos;
-        private float move_timer;
+        private Vector3 current_move_target;
+        private Vector3 current_move_target_next;
 
         private float attack_timer = 0f;
         private bool is_moving = false;
         private bool is_escaping = false;
         private bool is_attacking = false;
-        private bool is_stuck = false;
         private bool attack_hit = false;
-        private bool direct_move = false;
 
         private bool is_grounded = false;
         private bool is_fronted = false;
@@ -88,7 +80,6 @@ namespace SurvivalEngine
         private bool is_fronted_left = false;
         private bool is_fronted_right = false;
         private float front_dist = 0f;
-        private Vector3 ground_normal = Vector3.up;
         private float grounded_dist = 0f;
         private float grounded_dist_average = 0f;
         private float avoid_angle = 0f;
@@ -99,34 +90,28 @@ namespace SurvivalEngine
         private int path_index = 0;
         private bool follow_path = false;
         private bool calculating_path = false;
-        private float navmesh_timer = 0f;
-        private float ground_refesh_timer = 0f;
 
         private static List<Character> character_list = new List<Character>();
 
-        protected override void Awake()
+        void Awake()
         {
-            base.Awake();
             character_list.Add(this);
             rigid = GetComponent<Rigidbody>();
             selectable = GetComponent<Selectable>();
             destruct = GetComponent<Destructible>();
-            buildable = GetComponent<Buildable>();
             unique_id = GetComponent<UniqueID>();
             colliders = GetComponentsInChildren<Collider>();
+            start_pos = transform.position;
             avoid_side = Random.value < 0.5f ? 1f : -1f;
             facing = transform.forward;
             use_navmesh = move_enabled && use_navmesh;
-            current_scene = SceneNav.GetCurrentScene();
 
             move_target = transform.position;
-            move_target_avoid = transform.position;
+            current_move_target = transform.position;
+            current_move_target_next = transform.position;
 
-            destruct.onDamaged += OnDamaged;
-            destruct.onDeath += OnDeath;
-
-            if (buildable != null)
-                buildable.onBuild += OnBuild;
+            selectable.onUse += OnUse;
+            selectable.onDestroy += OnDeath;
 
             foreach (Collider collide in colliders)
             {
@@ -139,9 +124,8 @@ namespace SurvivalEngine
             }
         }
 
-        protected override void OnDestroy()
+        void OnDestroy()
         {
-            base.OnDestroy();
             character_list.Remove(this);
         }
 
@@ -152,15 +136,19 @@ namespace SurvivalEngine
                 return;
             }
 
-            //Set current position
-            SceneObjectData sobj = PlayerData.Get().GetSceneObject(GetUID());
-            if (sobj != null && sobj.scene == current_scene)
+            //Remove scene object and replace by spawned object so we can keep track of position and rotation in save file
+            TrainedCharacterData cdata = PlayerData.Get().GetCharacter(GetUID());
+            if (cdata == null && data != null && HasUID())
             {
-                transform.position = sobj.pos;
-                transform.rotation = sobj.rot;
+                PlayerData.Get().AddCharacterUID(GetUID(), data.id, SceneNav.GetCurrentScene(), transform.position, transform.rotation);
+                was_spawned = true;
             }
-
-            DetectGrounded(); //Check grounded
+            else if(cdata != null && cdata.scene == SceneNav.GetCurrentScene())
+            {
+                transform.position = cdata.pos;
+                transform.rotation = cdata.rot;
+                was_spawned = true;
+            }
         }
 
         private void FixedUpdate()
@@ -168,58 +156,36 @@ namespace SurvivalEngine
             if (TheGame.Get().IsPaused())
                 return;
 
+            //Detect obstacles and ground
+            is_grounded = DetectGrounded();
+            is_fronted = DetectFronted();
+
             if (!move_enabled)
                 return;
 
-            if (buildable && buildable.IsBuilding())
-                return;
-
             Vector3 tmove = Vector3.zero;
-            bool is_flying = fall_speed < 0.01f;
 
             if (!IsDead())
             {
-                //Destination default
-                move_target_avoid = move_target;
-
                 //Navmesh
-                if (use_navmesh && follow_path && !direct_move && is_moving && path_index < nav_paths.Length)
+                current_move_target_next = current_move_target;
+                if (use_navmesh && follow_path && is_moving && path_index < nav_paths.Length)
                 {
-                    move_target_avoid = nav_paths[path_index];
-                    Vector3 dir_total = move_target_avoid - transform.position;
+                    current_move_target_next = nav_paths[path_index];
+                    Vector3 dir_total = current_move_target_next - transform.position;
                     dir_total.y = 0f;
-                    if (dir_total.magnitude < moving_threshold * 2f)
+                    if (dir_total.magnitude < 0.2f)
                         path_index++;
                 }
 
                 //Navmesh
-                if (use_navmesh && is_moving && !direct_move)
+                if (use_navmesh && is_moving)
                 {
                     Vector3 path_dir = path_destination - transform.position;
-                    Vector3 nav_move_dir = move_target - transform.position;
+                    Vector3 nav_move_dir = current_move_target - transform.position;
                     float dot = Vector3.Dot(path_dir.normalized, nav_move_dir.normalized);
                     if (dot < 0.7f)
                         CalculateNavmesh();
-                }
-
-                //Avoiding
-                if (is_moving && !direct_move && avoid_obstacles && !use_navmesh && !HasReachedMoveTarget(1f))
-                    move_target_avoid = FindAvoidMoveTarget(move_target);
-
-                //Moving
-                if (is_moving)
-                {
-                    Vector3 move_dir_total = move_target - transform.position;
-                    Vector3 move_dir_next = move_target_avoid - transform.position;
-                    Vector3 move_dir = move_dir_next.normalized * Mathf.Min(move_dir_total.magnitude, 1f);
-                    tmove = move_dir.normalized * Mathf.Min(move_dir.magnitude, 1f) * move_speed;
-                }
-
-                //Facing
-                if (IsMoving())
-                {
-                    Vector3 tface = new Vector3(moving.x, 0f, moving.z);
-                    facing = tface.normalized;
                 }
 
                 //Rotation
@@ -227,41 +193,64 @@ namespace SurvivalEngine
                 Quaternion nrot = Quaternion.RotateTowards(rigid.rotation, targ_rot, rotate_speed * Time.fixedDeltaTime);
                 rigid.MoveRotation(nrot);
 
-                //Slope climbing
-                float slope_angle = Vector3.Angle(ground_normal, Vector3.up);
-                bool up_hill = Vector3.Dot(transform.forward, ground_normal) < -0.1f; //Climbing up
-                if (up_hill && !is_flying && slope_angle > slope_angle_max)
-                    tmove = Vector3.zero; // Slope too high
+                //Moving
+                if (is_moving)
+                {
+                    Vector3 move_dir_total = current_move_target - transform.position;
+                    Vector3 move_dir_next = current_move_target_next - transform.position;
+                    Vector3 move_dir = move_dir_next.normalized * Mathf.Min(move_dir_total.magnitude, 1f);
+                    //move_dir.y = 0f;
+
+                    tmove = move_dir.normalized * Mathf.Min(move_dir.magnitude, 1f) * move_speed;
+
+                    if (move_dir.magnitude > 0.1f)
+                    {
+                        facing = new Vector3(tmove.x, 0f, tmove.z);
+                        facing.Normalize();
+                    }
+                }
             }
 
             //Falling
-            if (!is_grounded && !is_flying)
+            if (!is_grounded && fall_speed > 0.01f)
                 tmove += Vector3.down * fall_speed;
-
-            //Cancel falling
-            if (is_grounded && tmove.y < 0f) 
+            if (is_grounded && tmove.y < 0f)
                 tmove.y = 0f;
-
-            //Adjust to slope
-            if (is_grounded && !is_flying) 
-                tmove = Vector3.ProjectOnPlane(tmove.normalized, ground_normal).normalized * tmove.magnitude;
 
             //Ground distance average
             if (is_grounded)
                 grounded_dist_average = Mathf.MoveTowards(grounded_dist_average, grounded_dist, 5f * Time.fixedDeltaTime);
 
             //Adjust ground
-            //if (is_grounded && grounded_dist_average > grounded_dist)
-            //    transform.position = Vector3.MoveTowards(transform.position, transform.position + Vector3.up * grounded_dist, 1f * Time.fixedDeltaTime);
+            if (is_grounded && grounded_dist_average > 0.01f)
+                transform.position = Vector3.MoveTowards(transform.position, transform.position + Vector3.up * grounded_dist, 1f * Time.fixedDeltaTime);
 
             moving = Vector3.Lerp(moving, tmove, 10f * Time.fixedDeltaTime);
             rigid.velocity = moving;
 
-            //Check the average traveled movement (allow to check if character is stuck)
-            Vector3 last_frame_travel = transform.position - prev_pos;
-            move_average = Vector3.MoveTowards(move_average, last_frame_travel, 2f * Time.fixedDeltaTime);
-            prev_pos = transform.position;
-            is_stuck = is_moving && move_average.magnitude < 0.02f && move_timer > 0.5f;
+            //Add an offset to escape path when fronted
+            if (avoid_obstacles)
+            {
+                if (is_fronted_left && !is_fronted_right)
+                    avoid_side = 1f;
+                if (is_fronted_right && !is_fronted_left)
+                    avoid_side = -1f;
+
+                //When fronted on all sides, use target to influence which side to go
+                if (is_fronted_center && is_fronted_left && is_fronted_right && target)
+                {
+                    Vector3 dir = target.transform.position - transform.position;
+                    dir = dir * (is_escaping ? -1f : 1f);
+                    float dot = Vector3.Dot(dir.normalized, transform.right);
+                    if(Mathf.Abs(dot) > 0.5f)
+                        avoid_side = Mathf.Sign(dot);
+                }
+
+                float angle = avoid_side * 90f;
+                float far_val = is_fronted ? 1f - (front_dist / destruct.hit_range) : Mathf.Abs(angle) / 90f; //1f = close, 0f = far
+                float angle_speed = far_val * 150f + 50f;
+                avoid_angle = Mathf.MoveTowards(avoid_angle, is_fronted ? angle : 0f, angle_speed * Time.fixedDeltaTime);
+            }
         }
 
         void Update()
@@ -272,27 +261,18 @@ namespace SurvivalEngine
             if (IsDead())
                 return;
 
-            if (buildable && buildable.IsBuilding())
-                return;
-
             attack_timer += Time.deltaTime;
-            move_timer += Time.deltaTime;
-            navmesh_timer += Time.deltaTime;
-            ground_refesh_timer += Time.deltaTime;
-
-            //Detect obstacles and ground
-            if (ground_refesh_timer > ground_refresh_rate)
-            {
-                ground_refesh_timer = Random.Range(-0.02f, 0.02f);
-                DetectGrounded();
-                DetectFronted();
-            }
 
             //Save position
-            PlayerData.Get().SetCharacterPosition(GetUID(), current_scene, transform.position, transform.rotation);
+            TrainedCharacterData cdata = PlayerData.Get().GetCharacter(unique_id.unique_id);
+            if (cdata != null)
+            {
+                cdata.pos = transform.position;
+                cdata.rot = transform.rotation;
+            }
 
             //Stop moving
-            if (is_moving && !HasTarget() && HasReachedMoveTarget(moving_threshold * 2f))
+            if (is_moving && !HasTarget() && HasReachedMoveTarget())
                 Stop();
 
             //Stop attacking
@@ -317,14 +297,14 @@ namespace SurvivalEngine
                         move_target = target.transform.position;
 
                         //Stop following
-                        if ((attack_target != null || attack_player != null) && targ_dir.magnitude < GetAttackTargetHitRange() * 0.8f)
+                        if (attack_target != null && targ_dir.magnitude < GetAttackTargetHitRange() * 0.8f)
                         {
                             move_target = transform.position;
                             is_moving = false;
                         }
 
                         //Stop following
-                        if (attack_target == null && attack_player == null && HasReachedMoveTarget(follow_distance))
+                        if (attack_target == null && HasReachedMoveTarget(follow_distance))
                         {
                             move_target = transform.position;
                             is_moving = false;
@@ -342,6 +322,12 @@ namespace SurvivalEngine
                 }
             }
 
+            current_move_target = move_target;
+
+            //Avoiding
+            if(is_moving && avoid_obstacles && !HasReachedMoveTarget(1f))
+                current_move_target = FindAvoidMoveTarget(move_target);
+
             //Attacking
             if (HasAttackTarget() && attack_enabled) {
 
@@ -350,6 +336,8 @@ namespace SurvivalEngine
                     if (attack_timer > attack_cooldown)
                     {
                         Vector3 targ_dir = (target.transform.position - transform.position);
+                        targ_dir.y = 0f;
+
                         if (targ_dir.magnitude < GetAttackTargetHitRange())
                         {
                             is_attacking = true;
@@ -366,7 +354,7 @@ namespace SurvivalEngine
                 if (is_attacking)
                 {
                     move_target = transform.position;
-                    move_target_avoid = transform.position;
+                    current_move_target = transform.position;
                     FaceTorward(target.transform.position);
 
                     if (!attack_hit && attack_timer > attack_windup)
@@ -375,9 +363,9 @@ namespace SurvivalEngine
                         if (range < GetAttackTargetHitRange())
                         {
                             if(attack_target != null)
-                                attack_target.TakeDamage(this, attack_damage);
+                                attack_target.DealDamage(attack_damage);
                             if (attack_player != null)
-                                attack_player.Combat.TakeDamage(attack_damage);
+                                attack_player.DealDamage(attack_damage);
                         }
                         attack_hit = true;
 
@@ -404,63 +392,18 @@ namespace SurvivalEngine
                 if (attack_player != null && attack_player.IsDead())
                     Stop();
             }
-
-            //Add an offset to escape path when fronted
-            if (avoid_obstacles && !direct_move)
-            {
-                if (is_fronted_left && !is_fronted_right)
-                    avoid_side = 1f;
-                if (is_fronted_right && !is_fronted_left)
-                    avoid_side = -1f;
-
-                //When fronted on all sides, use target to influence which side to go
-                if (is_fronted_center && is_fronted_left && is_fronted_right && target)
-                {
-                    Vector3 dir = target.transform.position - transform.position;
-                    dir = dir * (is_escaping ? -1f : 1f);
-                    float dot = Vector3.Dot(dir.normalized, transform.right);
-                    if (Mathf.Abs(dot) > 0.5f)
-                        avoid_side = Mathf.Sign(dot);
-                }
-
-                float angle = avoid_side * 90f;
-                float far_val = is_fronted ? 1f - (front_dist / destruct.hit_range) : Mathf.Abs(angle) / 90f; //1f = close, 0f = far
-                float angle_speed = far_val * 150f + 50f;
-                avoid_angle = Mathf.MoveTowards(avoid_angle, is_fronted ? angle : 0f, angle_speed * Time.deltaTime);
-            }
         }
 
         public void MoveTo(Vector3 pos)
         {
             move_target = pos;
-            move_target_avoid = pos;
+            current_move_target = pos;
             target = null;
             attack_target = null;
             attack_player = null;
             is_escaping = false;
             is_moving = true;
-            move_timer = 0f;
-            direct_move = false;
             CalculateNavmesh();
-        }
-
-        //Meant to be called every frame, for this reason don't do navmesh
-        public void DirectMoveTo(Vector3 pos)
-        {
-            move_target = pos;
-            move_target_avoid = pos;
-            target = null;
-            attack_target = null;
-            attack_player = null;
-            is_escaping = false;
-            is_moving = true;
-            direct_move = true;
-            move_timer = 0f;
-        }
-
-        public void DirectMoveToward(Vector3 dir)
-        {
-            DirectMoveTo(transform.position + dir.normalized);
         }
 
         public void Follow(GameObject target)
@@ -473,8 +416,6 @@ namespace SurvivalEngine
                 move_target = target.transform.position;
                 is_escaping = false;
                 is_moving = true;
-                move_timer = 0f;
-                direct_move = false;
                 CalculateNavmesh();
             }
         }
@@ -488,13 +429,11 @@ namespace SurvivalEngine
             move_target = transform.position - dir;
             is_escaping = true;
             is_moving = true;
-            move_timer = 0f;
-            direct_move = false;
         }
 
         public void Attack(Destructible target)
         {
-            if (attack_enabled && target != null && target != destruct && target.CanBeAttacked())
+            if (attack_enabled && target != null && target.CanBeAttacked())
             {
                 this.target = target.gameObject;
                 this.attack_target = target;
@@ -502,8 +441,6 @@ namespace SurvivalEngine
                 move_target = target.transform.position;
                 is_escaping = false;
                 is_moving = true;
-                move_timer = 0f;
-                direct_move = false;
                 CalculateNavmesh();
             }
         }
@@ -518,8 +455,6 @@ namespace SurvivalEngine
                 move_target = target.transform.position;
                 is_escaping = false;
                 is_moving = true;
-                move_timer = 0f;
-                direct_move = false;
                 CalculateNavmesh();
             }
         }
@@ -543,8 +478,6 @@ namespace SurvivalEngine
             move_target = transform.position;
             is_moving = false;
             is_attacking = false;
-            move_timer = 0f;
-            direct_move = false;
         }
 
         public void Kill()
@@ -557,13 +490,12 @@ namespace SurvivalEngine
 
         private void CalculateNavmesh()
         {
-            if (use_navmesh && !calculating_path && navmesh_timer > 0.5f)
+            if (use_navmesh && !calculating_path)
             {
                 calculating_path = true;
                 path_index = 0;
                 NavMeshTool.CalculatePath(transform.position, move_target, 1 << 0, FinishCalculateNavmesh);
                 path_destination = move_target;
-                navmesh_timer = 0f;
             }
         }
 
@@ -573,11 +505,10 @@ namespace SurvivalEngine
             follow_path = path.success;
             nav_paths = path.path;
             path_index = 0;
-            navmesh_timer = 0f;
         }
 
         //Check if touching the ground
-        private void DetectGrounded()
+        private bool DetectGrounded()
         {
             float radius = (bounds_extent.x + bounds_extent.z) * 0.5f;
             float center_offset = bounds_extent.y;
@@ -586,29 +517,57 @@ namespace SurvivalEngine
             Vector3 center = transform.position + bounds_center_offset;
             center.y = transform.position.y + center_offset;
 
-            float gdist; Vector3 gnormal;
-            is_grounded = PhysicsTool.DetectGround(transform, center, hradius, radius, ground_layer, out gdist, out gnormal);
-            ground_normal = gnormal;
-            grounded_dist = gdist;
+            Vector3 p1 = center;
+            Vector3 p2 = center + Vector3.left * radius;
+            Vector3 p3 = center + Vector3.right * radius;
+            Vector3 p4 = center + Vector3.forward * radius;
+            Vector3 p5 = center + Vector3.back * radius;
 
-            float slope_angle = Vector3.Angle(ground_normal, Vector3.up);
-            is_grounded = is_grounded && slope_angle <= slope_angle_max;
+            RaycastHit h1, h2, h3, h4, h5;
+            bool f1 = Physics.Raycast(p1, Vector3.down, out h1, hradius, ground_layer.value, QueryTriggerInteraction.Ignore);
+            bool f2 = Physics.Raycast(p2, Vector3.down, out h2, hradius, ground_layer.value, QueryTriggerInteraction.Ignore);
+            bool f3 = Physics.Raycast(p3, Vector3.down, out h3, hradius, ground_layer.value, QueryTriggerInteraction.Ignore);
+            bool f4 = Physics.Raycast(p4, Vector3.down, out h4, hradius, ground_layer.value, QueryTriggerInteraction.Ignore);
+            bool f5 = Physics.Raycast(p5, Vector3.down, out h5, hradius, ground_layer.value, QueryTriggerInteraction.Ignore);
+
+            bool grounded = f1 || f2 || f3 || f4 || f5;
+
+            //Find ground distance
+            if (grounded)
+            {
+                Vector3 hit_center = transform.position;
+                hit_center += f1 ? h1.point : transform.position;
+                hit_center += f2 ? h2.point : transform.position;
+                hit_center += f3 ? h3.point : transform.position;
+                hit_center += f4 ? h4.point : transform.position;
+                hit_center += f5 ? h5.point : transform.position;
+                hit_center = hit_center / 6f;
+                grounded_dist = (hit_center - transform.position).y;
+            }
+
+            //Debug.DrawRay(p1, Vector3.down * hradius);
+            //Debug.DrawRay(p2, Vector3.down * hradius);
+            //Debug.DrawRay(p3, Vector3.down * hradius);
+            //Debug.DrawRay(p4, Vector3.down * hradius);
+            //Debug.DrawRay(p5, Vector3.down * hradius);
+
+            return grounded;
         }
 
         //Detect if there is an obstacle in front of the character
-        private void DetectFronted()
+        private bool DetectFronted()
         {
             float radius = destruct.hit_range * 2f;
 
             Vector3 center = destruct.GetCenter();
-            Vector3 dir = move_target_avoid - transform.position;
+            Vector3 dir = current_move_target_next - transform.position;
             Vector3 dirl = Quaternion.AngleAxis(-45f, Vector3.up) * dir.normalized;
             Vector3 dirr = Quaternion.AngleAxis(45f, Vector3.up) * dir.normalized;
 
             RaycastHit h, hl, hr;
-            bool fc = PhysicsTool.RaycastCollision(center, dir.normalized * radius, out h);
-            bool fl = PhysicsTool.RaycastCollision(center, dirl.normalized * radius, out hl);
-            bool fr = PhysicsTool.RaycastCollision(center, dirr.normalized * radius, out hr);
+            bool fc = Physics.Raycast(center, dir.normalized, out h, radius, ~0, QueryTriggerInteraction.Ignore);
+            bool fl = Physics.Raycast(center, dirl.normalized, out hl, radius, ~0, QueryTriggerInteraction.Ignore);
+            bool fr = Physics.Raycast(center, dirr.normalized, out hr, radius, ~0, QueryTriggerInteraction.Ignore);
             is_fronted_center = fc && (target == null || h.collider.gameObject != target);
             is_fronted_left = fl && (target == null || hl.collider.gameObject != target);
             is_fronted_right = fr && (target == null || hr.collider.gameObject != target);
@@ -617,22 +576,13 @@ namespace SurvivalEngine
             front_dist = (fc ? h.distance : 0f) + (fl ? hl.distance : 0f) + (fr ? hr.distance : 0f);
             if (front_count > 0) front_dist = front_dist / (float)front_count;
 
-            is_fronted = is_fronted_center || is_fronted_left || is_fronted_right;
+            return is_fronted_center || is_fronted_left || is_fronted_right;
         }
 
-        private void OnBuild()
+        private void OnUse(PlayerCharacter character)
         {
-            if (data != null)
-            {
-                TrainedCharacterData cdata = PlayerData.Get().AddCharacter(data.id, current_scene, transform.position, transform.rotation);
-                unique_id.unique_id = cdata.uid;
-            }
-        }
+            //Use
 
-        private void OnDamaged()
-        {
-            if (onDamaged != null)
-                onDamaged.Invoke();
         }
 
         private void OnDeath()
@@ -642,7 +592,6 @@ namespace SurvivalEngine
             rigid.isKinematic = true;
             target = null;
             attack_target = null;
-            attack_player = null;
             move_target = transform.position;
             is_moving = false;
 
@@ -651,12 +600,6 @@ namespace SurvivalEngine
 
             if (onDeath != null)
                 onDeath.Invoke();
-
-            if (data != null)
-            {
-                foreach (PlayerCharacter character in PlayerCharacter.GetAll())
-                    character.Data.AddKillCount(data.id); //Add kill count
-            }
 
             PlayerData.Get().RemoveCharacter(GetUID());
             if (!was_spawned)
@@ -671,13 +614,7 @@ namespace SurvivalEngine
             return transform.position + targ_dir;
         }
 
-        //Did it reach its target destination?
-        public bool HasReachedMoveTarget()
-        {
-            return HasReachedMoveTarget(moving_threshold * 2f); //Double threshold to make sure it doesn't stop moving before reaching it
-        }
-
-        public bool HasReachedMoveTarget(float distance)
+        public bool HasReachedMoveTarget(float distance=0.11f)
         {
             Vector3 diff = move_target - transform.position;
             return (diff.magnitude < distance);
@@ -710,31 +647,15 @@ namespace SurvivalEngine
             return attack_range;
         }
 
-        public bool IsAttacking()
-        {
-            if (HasAttackTarget()) {
-                Vector3 targ_dir = (target.transform.position - transform.position);
-                return targ_dir.magnitude < GetAttackTargetHitRange();
-            }
-            return false;
-        }
-
         public bool IsDead()
         {
             return destruct.IsDead();
         }
 
-        //Is actually moving
         public bool IsMoving()
         {
             Vector3 moveXZ = new Vector3(moving.x, 0f, moving.z);
-            return is_moving && moveXZ.magnitude > moving_threshold;
-        }
-
-        //Order to move given
-        public bool IsTryMoving()
-        {
-            return is_moving;
+            return is_moving && moveXZ.magnitude > 0.2f;
         }
 
         public Vector3 GetMove()
@@ -767,11 +688,6 @@ namespace SurvivalEngine
             return is_fronted_right;
         }
 
-        public bool IsStuck()
-        {
-            return is_stuck;
-        }
-
         public bool HasUID()
         {
             return !string.IsNullOrEmpty(unique_id.unique_id);
@@ -780,18 +696,6 @@ namespace SurvivalEngine
         public string GetUID()
         {
             return unique_id.unique_id;
-        }
-
-        public string GetSubUID(string tag)
-        {
-            return unique_id.GetSubUID(tag);
-        }
-
-        public bool HasGroup(GroupData group)
-        {
-            if (data != null)
-                return data.HasGroup(group) || selectable.HasGroup(group);
-            return selectable.HasGroup(group);
         }
 
         public Selectable GetSelectable()
@@ -804,17 +708,7 @@ namespace SurvivalEngine
             return destruct;
         }
 
-        public Buildable GetBuildable()
-        {
-            return buildable; //Can be null
-        }
-
-        public TrainedCharacterData SaveData
-        {
-            get { return PlayerData.Get().GetCharacter(GetUID()); }
-        }
-
-        public static new Character GetNearest(Vector3 pos, float range = 999f)
+        public static Character GetNearest(Vector3 pos, float range = 999f)
         {
             Character nearest = null;
             float min_dist = range;
@@ -830,32 +724,6 @@ namespace SurvivalEngine
             return nearest;
         }
 
-        public static int CountInRange(Vector3 pos, float range)
-        {
-            int count = 0;
-            foreach (Character character in GetAll())
-            {
-                float dist = (character.transform.position - pos).magnitude;
-                if (dist < range && !character.IsDead())
-                    count++;
-            }
-            return count;
-        }
-
-        public static int CountInRange(CharacterData data, Vector3 pos, float range)
-        {
-            int count = 0;
-            foreach (Character character in GetAll())
-            {
-                if (character.data == data && !character.IsDead()) {
-                    float dist = (character.transform.position - pos).magnitude;
-                    if (dist < range)
-                        count++;
-                }
-            }
-            return count;
-        }
-
         public static Character GetByUID(string uid)
         {
             if (!string.IsNullOrEmpty(uid))
@@ -869,18 +737,7 @@ namespace SurvivalEngine
             return null;
         }
 
-        public static List<Character> GetAllOf(CharacterData data)
-        {
-            List<Character> valid_list = new List<Character>();
-            foreach (Character character in character_list)
-            {
-                if (character.data == data)
-                    valid_list.Add(character);
-            }
-            return valid_list;
-        }
-
-        public static new List<Character> GetAll()
+        public static List<Character> GetAll()
         {
             return character_list;
         }
@@ -889,7 +746,7 @@ namespace SurvivalEngine
         public static Character Spawn(string uid, Transform parent = null)
         {
             TrainedCharacterData tcdata = PlayerData.Get().GetCharacter(uid);
-            if (tcdata != null && tcdata.scene == SceneNav.GetCurrentScene())
+            if (tcdata != null)
             {
                 CharacterData cdata = CharacterData.Get(tcdata.character_id);
                 if (cdata != null)
@@ -907,32 +764,24 @@ namespace SurvivalEngine
             return null;
         }
 
-        //Create a totally new one that will be added to save file, but only after constructed by the player
-        public static Character CreateBuildMode(CharacterData data, Vector3 pos)
-        {
-            GameObject build = Instantiate(data.character_prefab, pos, data.character_prefab.transform.rotation);
-            Character character = build.GetComponent<Character>();
-            character.data = data;
-            character.was_spawned = true;
-            return character;
-        }
-
         //Create a totally new one that will be added to save file
         public static Character Create(CharacterData data, Vector3 pos)
         {
             Quaternion rot = Quaternion.Euler(0f, 180f, 0f);
-            Character unit = Create(data, pos, rot);
-            return unit;
-        }
-
-        public static Character Create(CharacterData data, Vector3 pos, Quaternion rot)
-        {
             TrainedCharacterData ditem = PlayerData.Get().AddCharacter(data.id, SceneNav.GetCurrentScene(), pos, rot);
             GameObject build = Instantiate(data.character_prefab, pos, rot);
             Character unit = build.GetComponent<Character>();
             unit.data = data;
             unit.was_spawned = true;
             unit.unique_id.unique_id = ditem.uid;
+            return unit;
+        }
+
+        //Create a totally new one that will be added to save file
+        public static Character Create(CharacterData data, Vector3 pos, Quaternion rot)
+        {
+            Character unit = Create(data, pos);
+            unit.transform.rotation = rot;
             return unit;
         }
     }

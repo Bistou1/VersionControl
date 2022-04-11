@@ -13,6 +13,13 @@ namespace SurvivalEngine
         CantAttack =50, //Cannot be attacked
     }
 
+    [System.Serializable]
+    public struct RandomLoot
+    {
+        public CraftData item;
+        public float probability; //Between 0 and 1
+    }
+
     /// <summary>
     /// Destructibles are objects that can be destroyed. They have HP and can be damaged by the player or by animals. 
     /// They often spawn loot items when destroyed (or killed)
@@ -25,7 +32,6 @@ namespace SurvivalEngine
         [Header("Stats")]
         public int hp = 100;
         public int armor = 0; //Reduces each attack's damage by the armor value
-        public float hp_regen = 0f; //HP regen per game-hour
 
         [Header("Targeting")]
         public AttackGroup attack_group; //Check above for description of each group
@@ -36,22 +42,18 @@ namespace SurvivalEngine
 
         [Header("Loot")]
         public int xp = 0;
-        public SData[] loots;
+        public CraftData[] loots;
+        public RandomLoot[] loots_random;
 
         [Header("FX")]
         public bool shake_on_hit = true; //Shake animation when hit
         public float destroy_delay = 0f; //In seconds, use this if you want a death animation before the object disappears
         public GameObject attack_center; //For projectiles mostly, since most objects have their pivot directly on the floor, we sometimes dont want projectiles to aim at the pivot but at this position instead
-
-        public GameObject hp_bar;
-        public GameObject hit_fx; //Prefab spawned then hit
         public GameObject death_fx; //Prefab spawned then dying
         public AudioClip hit_sound;
         public AudioClip death_sound;
 
         //Events
-        public UnityAction<Character> onDamagedByCharacter;
-        public UnityAction<PlayerCharacter> onDamagedByPlayer;
         public UnityAction onDamaged;
         public UnityAction onDeath;
 
@@ -66,8 +68,6 @@ namespace SurvivalEngine
         private float shake_timer = 0f;
         private float shake_intensity = 1f;
         private int max_hp;
-        private float hp_regen_val;
-        private HPBar hbar = null;
 
         void Awake()
         {
@@ -86,9 +86,9 @@ namespace SurvivalEngine
                 return;
             }
 
-            if (HasUID() && PlayerData.Get().HasCustomInt(GetHpUID()))
+            if (HasUID() && PlayerData.Get().HasUniqueID(GetHpUID()))
             {
-                hp = PlayerData.Get().GetCustomInt(GetHpUID());
+                hp = PlayerData.Get().GetUniqueID(GetHpUID());
             }
         }
 
@@ -113,90 +113,29 @@ namespace SurvivalEngine
                     is_shaking = false;
                 }
             }
-
-            //Spawn HP bar
-            if (hp > 0 && hp < max_hp && hbar == null && hp_bar != null)
-            {
-                GameObject hp_obj = Instantiate(hp_bar, transform);
-                hbar = hp_obj.GetComponent<HPBar>();
-                hbar.target = this;
-            }
-
-            //Regen HP
-            if (!dead && hp_regen > 0.01f && hp < max_hp)
-            {
-                float game_speed = TheGame.Get().GetGameTimeSpeedPerSec();
-                hp_regen_val += game_speed * Time.deltaTime;
-                if (hp_regen_val >= 1f)
-                {
-                    hp_regen_val -= 1f;
-                    hp += 1;
-                }
-            }
-        }
-
-        //Deal damage from character
-        public void TakeDamage(Character attacker, int damage)
-        {
-            if (!dead)
-            {
-                ApplyDamage(damage);
-
-                onDamagedByCharacter?.Invoke(attacker);
-
-                if (hp <= 0)
-                    Kill();
-            }
-        }
-
-        //Deal damage from player
-        public void TakeDamage(PlayerCharacter attacker, int damage)
-        {
-            if (!dead)
-            {
-                ApplyDamage(damage);
-
-                onDamagedByPlayer?.Invoke(attacker);
-
-                if (hp <= 0)
-                    Kill();
-            }
-        }
-
-        //Take damage from no sources (like trap)
-        public void TakeDamage(int damage)
-        {
-            if (!dead)
-            {
-                ApplyDamage(damage);
-
-                if (hp <= 0)
-                    Kill();
-            }
         }
 
         //Deal damages to the destructible, if it reaches 0 HP it will be killed
-        private void ApplyDamage(int damage)
+        public void DealDamage(int damage)
         {
             if (!dead)
             {
                 int adamage = Mathf.Max(damage - armor, 1);
                 hp -= adamage;
 
-                PlayerData.Get().SetCustomInt(GetHpUID(), hp);
+                if (onDamaged != null)
+                    onDamaged.Invoke();
 
                 if (shake_on_hit)
                     ShakeFX();
 
+                if (hp <= 0)
+                    Kill();
+
+                PlayerData.Get().SetUniqueID(GetHpUID(), hp);
+
                 if (select.IsActive() && select.IsNearCamera(20f))
-                {
-                    if (hit_fx != null)
-                        Instantiate(hit_fx, transform.position, Quaternion.identity);
-
                     TheAudio.Get().PlaySFX("destruct", hit_sound);
-                }
-
-                onDamaged?.Invoke();
             }
         }
 
@@ -207,24 +146,12 @@ namespace SurvivalEngine
                 hp += value;
                 hp = Mathf.Min(hp, max_hp);
 
-                PlayerData.Get().SetCustomInt(GetHpUID(), hp);
+                PlayerData.Get().SetUniqueID(GetHpUID(), hp);
             }
         }
 
         //Kill the destructible
         public void Kill()
-        {
-            if (!dead)
-            {
-                SpawnLoots();
-                GiveXPLoot();
-                DropStorage();
-                KillFX();
-                KillNoLoot();
-            }
-        }
-
-        public void KillNoLoot()
         {
             if (!dead)
             {
@@ -234,70 +161,65 @@ namespace SurvivalEngine
                 foreach (Collider collide in colliders)
                     collide.enabled = false;
 
-                PlayerData.Get().RemoveObject(GetUID()); //Remove object if it was in initial scene
-                PlayerData.Get().RemoveSpawnedObject(GetUID()); //Remove object if it was spawned
-                PlayerData.Get().RemoveCustomInt(GetHpUID()); //Remove HP custom value
+                //Loot
+                foreach (CraftData item in loots)
+                {
+                    SpawnLoot(item);
+                }
+
+                foreach (RandomLoot loot in loots_random)
+                {
+                    if (Random.value < loot.probability)
+                    {
+                        SpawnLoot(loot.item);
+                    }
+                }
+
+                PlayerData.Get().xp += xp;
+
+                //Loot storage
+                StoredItemData sdata = PlayerData.Get().GetStoredData(GetUID());
+                if (sdata != null)
+                {
+                    foreach (KeyValuePair<int, InventoryItemData> item in sdata.items)
+                    {
+                        ItemData idata = ItemData.Get(item.Value.item_id);
+                        if (idata != null && item.Value.quantity > 0)
+                        {
+                            SpawnLoot(idata, item.Value.quantity, item.Value.durability);
+                        }
+                    }
+                }
+
+                PlayerData.Get().RemoveObject(GetUID());
+                PlayerData.Get().RemoveUniqueID(GetHpUID());
 
                 if (onDeath != null)
                     onDeath.Invoke();
+
+                //FX
+                if (select.IsActive() && select.IsNearCamera(20f))
+                {
+                    if (death_fx != null)
+                        Instantiate(death_fx, transform.position, Quaternion.identity);
+
+                    TheAudio.Get().PlaySFX("destruct", death_sound);
+                }
 
                 select.Destroy(destroy_delay);
             }
         }
 
-        private void KillFX()
+        public void SpawnLoot(CraftData item, int quantity=1, float durability=0f)
         {
-            //FX
-            if (select.IsActive() && select.IsNearCamera(20f))
-            {
-                if (death_fx != null)
-                    Instantiate(death_fx, transform.position, Quaternion.identity);
-
-                TheAudio.Get().PlaySFX("destruct", death_sound);
-            }
-        }
-
-        public void GiveXPLoot()
-        {
-            foreach (PlayerCharacter player in PlayerCharacter.GetAll())
-                player.Data.GainXP(xp);
-        }
-
-        public void DropStorage()
-        {
-            //Drop storage items
-            InventoryData sdata = InventoryData.Get(InventoryType.Storage, GetUID());
-            if (sdata != null)
-            {
-                foreach (KeyValuePair<int, InventoryItemData> item in sdata.items)
-                {
-                    ItemData idata = ItemData.Get(item.Value.item_id);
-                    if (idata != null && item.Value.quantity > 0)
-                    {
-                        Item.Create(idata, GetLootRandomPos(), item.Value.quantity, item.Value.durability, item.Value.uid);
-                    }
-                }
-            }
-        }
-
-        public void SpawnLoots()
-        {
-            foreach (SData item in loots)
-            {
-                SpawnLoot(item);
-            }
-        }
-
-        public void SpawnLoot(SData item, int quantity=1)
-        {
-            if (item == null || quantity <= 0)
-                return;
-
-            Vector3 pos = GetLootRandomPos();
+            float radius = Random.Range(0.5f, 1f);
+            float angle = Random.Range(0f, 360f) * Mathf.Rad2Deg;
+            Vector3 pos = transform.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
             if (item is ItemData)
             {
                 ItemData aitem = (ItemData)item;
-                Item.Create(aitem, pos, quantity);
+                float idura = durability > 0.01f ? durability : aitem.durability; 
+                Item.Create(aitem, pos, quantity, idura);
             }
             if (item is ConstructionData)
             {
@@ -309,26 +231,6 @@ namespace SurvivalEngine
                 PlantData plant_data = (PlantData)item;
                 Plant.Create(plant_data, pos, 0);
             }
-            if (item is SpawnData)
-            {
-                SpawnData spawn_data = (SpawnData)item;
-                Spawnable.Create(spawn_data, pos);
-            }
-            if (item is LootData)
-            {
-                LootData loot = (LootData)item;
-                if (Random.value <= loot.probability)
-                {
-                    SpawnLoot(loot.item, loot.quantity);
-                }
-            }
-        }
-
-        private Vector3 GetLootRandomPos()
-        {
-            float radius = Random.Range(0.5f, 1f);
-            float angle = Random.Range(0f, 360f) * Mathf.Rad2Deg;
-            return transform.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
         }
 
         //Delayed kill (useful if the attacking character doing an animation before destroying this)
@@ -401,14 +303,14 @@ namespace SurvivalEngine
         }
 
         //Get nearest auto attack for player
-        public static Destructible GetNearestAutoAttack(PlayerCharacter character, Vector3 pos, float range = 999f)
+        public static Destructible GetNearestAutoAttack(Vector3 pos, float range = 999f)
         {
             Destructible nearest = null;
             float min_dist = range;
             foreach (Selectable selectable in Selectable.GetAllActive()) //Loop on active selectables only for optimization
             {
                 Destructible destruct = selectable.GetDestructible();
-                if (destruct != null && character.Combat.CanAutoAttack(destruct))
+                if (destruct != null && selectable.IsActive() && !destruct.IsDead() && (destruct.attack_group == AttackGroup.Neutral || destruct.attack_group == AttackGroup.Enemy))
                 {
                     float dist = (destruct.transform.position - pos).magnitude;
                     if (dist < min_dist)
@@ -422,7 +324,7 @@ namespace SurvivalEngine
         }
 
         //Get nearest active destructible selectable
-        public static Destructible GetNearest(Vector3 pos, float range = 999f)
+        public static Destructible GetNearestDestructible(Vector3 pos, float range = 999f)
         {
             Destructible nearest = null;
             float min_dist = range;

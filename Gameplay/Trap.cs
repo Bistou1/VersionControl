@@ -12,13 +12,10 @@ namespace SurvivalEngine
     public class Trap : MonoBehaviour
     {
         public int damage = 50;
-        public GroupData target_group; //If set, will only trap that group, if not set, will trap all characters
 
         public GameObject active_model;
         public GameObject triggered_model;
 
-        private Construction construct;
-        private Buildable buildable;
         private bool triggered = false;
         private float trigger_timer = 0f;
 
@@ -26,8 +23,6 @@ namespace SurvivalEngine
         {
             active_model.SetActive(true);
             triggered_model.SetActive(false);
-            construct = GetComponent<Construction>();
-            buildable = GetComponent<Buildable>();
         }
 
         void Update()
@@ -37,27 +32,16 @@ namespace SurvivalEngine
         }
 
         //Trigger will 'close' the trap and damage the animal triggering it
-        public void Trigger(Character triggerer)
+        public void Trigger(GameObject triggerer)
         {
-            if (buildable != null && buildable.IsBuilding())
-                return;
-
             if (!triggered && trigger_timer > 2f)
             {
                 triggered = true;
                 active_model.SetActive(false);
                 triggered_model.SetActive(true);
 
-                //Durability
-                if (construct != null) {
-                    BuiltConstructionData bdata = PlayerData.Get().GetConstructed(construct.GetUID());
-                    if (bdata != null && construct.data != null && construct.data.durability_type == DurabilityType.UsageCount)
-                        bdata.durability -= 1f;
-                }
-
-                //Deal damage
-                if (triggerer)
-                    triggerer.GetDestructible().TakeDamage(damage);
+                if (triggerer.GetComponent<Destructible>())
+                    triggerer.GetComponent<Destructible>().DealDamage(damage);
             }
         }
 
@@ -82,12 +66,8 @@ namespace SurvivalEngine
         {
             if (!triggered)
             {
-                Character character = other.GetComponent<Character>();
-                if (character != null)
-                {
-                    if (target_group == null || character.HasGroup(target_group))
-                        Trigger(character);
-                }
+                if (other.GetComponent<Animal>() || other.GetComponent<Bird>())
+                    Trigger(other.gameObject);
             }
         }
     }
