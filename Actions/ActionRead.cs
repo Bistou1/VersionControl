@@ -9,7 +9,7 @@ namespace SurvivalEngine
     /// </summary>
     
 
-    [CreateAssetMenu(fileName = "Action", menuName = "SurvivalEngine/Actions/Read", order = 50)]
+    [CreateAssetMenu(fileName = "Action", menuName = "Data/Actions/Read", order = 50)]
     public class ActionRead : SAction
     {
 

@@ -8,14 +8,16 @@ namespace SurvivalEngine
     /// Drop an item 
     /// </summary>
     
-    [CreateAssetMenu(fileName = "Action", menuName = "SurvivalEngine/Actions/Drop", order = 50)]
+    [CreateAssetMenu(fileName = "Action", menuName = "Data/Actions/Drop", order = 50)]
     public class ActionDrop : SAction
     {
 
         public override void DoAction(PlayerCharacter character, ItemSlot slot)
         {
-            InventoryData inventory = slot.GetInventory();
-            character.Inventory.DropItem(inventory, slot.index);
+            if (slot.is_equip)
+                character.DropEquippedItem(slot.index);
+            else
+                character.DropItem(slot.index);
         }
     }
 

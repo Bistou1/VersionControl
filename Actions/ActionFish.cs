@@ -8,7 +8,7 @@ namespace SurvivalEngine
     /// Use your fishing rod to fish a fish!
     /// </summary>
     
-    [CreateAssetMenu(fileName = "Action", menuName = "SurvivalEngine/Actions/Fish", order = 50)]
+    [CreateAssetMenu(fileName = "Action", menuName = "Data/Actions/Fish", order = 50)]
     public class ActionFish : SAction
     {
         public GroupData fishing_rod;
@@ -33,7 +33,7 @@ namespace SurvivalEngine
         public override bool CanDoAction(PlayerCharacter character, Selectable select)
         {
             ItemProvider pond = select.GetComponent<ItemProvider>();
-            return pond != null && pond.HasItem() && character.EquipData.HasItemInGroup(fishing_rod) && !character.IsSwimming();
+            return pond != null && pond.HasItem() && character.HasEquippedItemInGroup(fishing_rod);
         }
     }
 

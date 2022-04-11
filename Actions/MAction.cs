@@ -9,7 +9,7 @@ namespace SurvivalEngine
     /// Merge Action parent class: Any action that happens when mixing two items (ex: coconut and axe), or one item with a selectable (ex: raw food on top of fire)
     /// </summary>
 
-    public abstract class MAction : SAction
+    public class MAction : SAction
     {
         public GroupData merge_target;
 
@@ -25,23 +25,6 @@ namespace SurvivalEngine
 
         }
 
-        //Condition when merging item-item, override if you need to add a new condition
-        public virtual bool CanDoAction(PlayerCharacter character, ItemSlot slot, ItemSlot slot_other) //slot_other is the one without the action
-        {
-            ItemData item = slot_other.GetItem();
-            return item != null && item.HasGroup(merge_target);
-        }
-
-        //Condition when mergin item-select, override if you need to add a new condition
-        public virtual bool CanDoAction(PlayerCharacter character, ItemSlot slot, Selectable select)
-        {
-            return select != null && select.HasGroup(merge_target);
-        }
-
-
-        //---- Override basic action, to be able to use Merge actions are regular ones
-
-        //Do the action using the nearest selectable
         public override void DoAction(PlayerCharacter character, ItemSlot slot)
         {
             Selectable select = Selectable.GetNearestGroup(merge_target, character.transform.position);
@@ -51,14 +34,17 @@ namespace SurvivalEngine
             }
         }
 
-        public override bool CanDoAction(PlayerCharacter character, ItemSlot slot)
+        //Condition for the action to be allowed, override if you need to add a new condition
+        public override bool CanDoAction(PlayerCharacter character, ItemSlot slot_other) //slot_other is the one without the action
         {
-            Selectable select = Selectable.GetNearestGroup(merge_target, character.transform.position);
-            if (select != null && select.IsInUseRange(character.transform.position))
-            {
-                return CanDoAction(character, slot, select);
-            }
-            return false;
+            ItemData item = slot_other.GetItem();
+            return item != null && item.HasGroup(merge_target);
+        }
+
+        //Condition for the action to be allowed, override if you need to add a new condition
+        public override bool CanDoAction(PlayerCharacter character, Selectable select)
+        {
+            return select != null && select.HasGroup(merge_target);
         }
 
     }

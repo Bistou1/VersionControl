@@ -8,7 +8,7 @@ namespace SurvivalEngine
     /// Just destroy the destructible
     /// </summary>
 
-    [CreateAssetMenu(fileName = "Action", menuName = "SurvivalEngine/Actions/Destroy", order = 50)]
+    [CreateAssetMenu(fileName = "Action", menuName = "Data/Actions/Destroy", order = 50)]
     public class ActionDestroy : AAction
     {
         public string animation;
@@ -16,8 +16,7 @@ namespace SurvivalEngine
         public override void DoAction(PlayerCharacter character, Selectable select)
         {
             select.GetDestructible().KillIn(0.5f);
-            character.TriggerAnim(animation, select.transform.position);
-            character.TriggerAction(0.5f);
+            character.TriggerAction(animation, select.transform.position);
         }
 
         public override bool CanDoAction(PlayerCharacter character, Selectable select)

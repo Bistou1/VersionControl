@@ -8,7 +8,7 @@ namespace SurvivalEngine
     /// Drink directly from a water source
     /// </summary>
 
-    [CreateAssetMenu(fileName = "Action", menuName = "SurvivalEngine/Actions/DrinkPond", order = 50)]
+    [CreateAssetMenu(fileName = "Action", menuName = "Data/Actions/DrinkPond", order = 50)]
     public class ActionDrinkPond : SAction
     {
         public float drink_hp;
@@ -18,14 +18,13 @@ namespace SurvivalEngine
 
         public override void DoAction(PlayerCharacter character, Selectable select)
         {
-            string animation = character.Animation ? character.Animation.take_anim : "";
-            character.TriggerAnim(animation, select.transform.position);
-            character.TriggerAction(0.5f, () =>
+            string animation = PlayerCharacterAnim.Get() ? PlayerCharacterAnim.Get().take_anim : "";
+            character.TriggerAction(animation, select.transform.position, 0.5f, () =>
             {
-                character.Attributes.AddAttribute(AttributeType.Health, drink_hp);
-                character.Attributes.AddAttribute(AttributeType.Hunger, drink_hunger);
-                character.Attributes.AddAttribute(AttributeType.Thirst, drink_thirst);
-                character.Attributes.AddAttribute(AttributeType.Happiness, drink_happiness);
+                PlayerData.Get().AddAttributeValue(AttributeType.Health, drink_hp, character.GetAttributeMax(AttributeType.Health));
+                PlayerData.Get().AddAttributeValue(AttributeType.Hunger, drink_hunger, character.GetAttributeMax(AttributeType.Hunger));
+                PlayerData.Get().AddAttributeValue(AttributeType.Thirst, drink_thirst, character.GetAttributeMax(AttributeType.Thirst));
+                PlayerData.Get().AddAttributeValue(AttributeType.Happiness, drink_happiness, character.GetAttributeMax(AttributeType.Happiness));
 
             });
             

@@ -8,24 +8,28 @@ namespace SurvivalEngine
     /// Cut a plant and return it to growth stage 0, and gain items (cut grass)
     /// </summary>
 
-    [CreateAssetMenu(fileName = "Action", menuName = "SurvivalEngine/Actions/CutPlant", order = 50)]
+    [CreateAssetMenu(fileName = "Action", menuName = "Data/Actions/CutPlant", order = 50)]
     public class ActionCutPlant : AAction
     {
+        public ItemData[] loots;
+
         public override void DoAction(PlayerCharacter character, Selectable select)
         {
             Plant plant = select.GetComponent<Plant>();
             if (plant != null)
             {
-                string animation = character.Animation ? character.Animation.take_anim : "";
-                character.TriggerAnim(animation, plant.transform.position);
-                character.TriggerAction(0.5f, () =>
+                string animation = PlayerCharacterAnim.Get() ? PlayerCharacterAnim.Get().take_anim : "";
+                character.TriggerAction(animation, plant.transform.position, 0.5f, () =>
                 {
                     plant.GrowPlant(0);
 
                     Destructible destruct = plant.GetDestructible();
                     TheAudio.Get().PlaySFX("destruct", destruct.death_sound);
 
-                    destruct.SpawnLoots();
+                    foreach (ItemData item in loots)
+                    {
+                        destruct.SpawnLoot(item);
+                    }
                 });
             }
         }

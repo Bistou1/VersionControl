@@ -9,7 +9,7 @@ namespace SurvivalEngine
     /// </summary>
     
 
-    [CreateAssetMenu(fileName = "Action", menuName = "SurvivalEngine/Actions/Learn", order = 50)]
+    [CreateAssetMenu(fileName = "Action", menuName = "Data/Actions/Learn", order = 50)]
     public class ActionLearn : SAction
     {
         public AudioClip learn_audio;
@@ -20,16 +20,15 @@ namespace SurvivalEngine
         {
             foreach (CraftData data in learn_list)
             {
-                character.Crafting.LearnCraft(data.id);
+                PlayerData.Get().UnlockID(data.id);
             }
 
             TheAudio.Get().PlaySFX("learn", learn_audio);
 
-            InventoryData inventory = slot.GetInventory();
             if (destroy_on_learn)
-                inventory.RemoveItemAt(slot.index, 1);
+                PlayerData.Get().RemoveItemAt(slot.index, 1);
 
-            CraftSubPanel.Get(character.player_id)?.RefreshCraftPanel();
+            CraftSubBar.Get().RefreshPanel();
         }
 
         public override bool CanDoAction(PlayerCharacter character, ItemSlot slot)

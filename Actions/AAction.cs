@@ -5,40 +5,22 @@ using UnityEngine;
 namespace SurvivalEngine
 {
     /// <summary>
-    /// Automatic Action parent class: Any action performed automatically when the object is clicked on
+    /// Automatic Action parent class: Any action performed automatically when the object is clicked on (selectable only)
     /// If you put more than 1, first AAction in the list that can be performed will be selected
     /// </summary>
     
-    public abstract class AAction : SAction
+    public class AAction : SAction
     {
-        //When clicking on a Selectable in the scene
+        //When using an action on a Selectable in the scene
         public override void DoAction(PlayerCharacter character, Selectable select)
         {
 
         }
 
-        //When right-clicking (or pressing Use) a ItemData in inventory
-        public override void DoAction(PlayerCharacter character, ItemSlot slot)
-        {
-
-        }
-
-        //When left-clicking (or selecting) a ItemData in inventory
-        public virtual void DoSelectAction(PlayerCharacter character, ItemSlot slot)
-        {
-
-        }
-
-        //Condition to check if the selectable action is possible
+        //Condition to check if the action is possible, override to add a condition
         public override bool CanDoAction(PlayerCharacter character, Selectable select)
         {
-            return true; //No condition
-        }
-
-        //Condition to check if the item action is possible
-        public override bool CanDoAction(PlayerCharacter character, ItemSlot slot)
-        {
-            return true; //No condition
+            return true;
         }
     }
 

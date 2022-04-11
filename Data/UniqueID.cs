@@ -17,13 +17,11 @@ namespace SurvivalEngine
         [TextArea(1, 2)]
         public string unique_id; //The unique ID, should be empty in the prefab. Should only be added to instances in the scene. Can be automatically generated
 
-        private Dictionary<string, string> sub_dict = new Dictionary<string, string>();
-
         private static Dictionary<string, UniqueID> dict_id = new Dictionary<string, UniqueID>();
 
         void Awake()
         {
-            if (!string.IsNullOrEmpty(unique_id))
+            if (unique_id != "")
             {
                 dict_id[unique_id] = this;
             }
@@ -34,35 +32,19 @@ namespace SurvivalEngine
             dict_id.Remove(unique_id);
         }
 
-        private void Start()
+        public void SetValue(int value)
         {
-            if (HasUID() && PlayerData.Get().IsObjectHidden(unique_id))
-                gameObject.SetActive(false);
-
-            if (!HasUID() && Time.time < 0.1f)
-                Debug.LogWarning("UID is empty on " + gameObject.name + ". Make sure to generate UIDs with SurvivalEngine->Generate UID");
+            PlayerData.Get().SetUniqueID(unique_id, value);
         }
 
-        public void Hide()
+        public int GetValue()
         {
-            PlayerData.Get().HideObject(unique_id);
-            gameObject.SetActive(false);
+            return PlayerData.Get().GetUniqueID(unique_id);
         }
 
-        public void Show()
+        public bool HasValue()
         {
-            PlayerData.Get().ShowObject(unique_id);
-            gameObject.SetActive(true);
-        }
-
-        public void SetUID(string uid)
-        {
-            if (dict_id.ContainsKey(unique_id))
-                dict_id.Remove(unique_id);
-            unique_id = uid;
-            if (!string.IsNullOrEmpty(unique_id))
-                dict_id[unique_id] = this;
-            sub_dict.Clear();
+            return PlayerData.Get().HasUniqueID(unique_id);
         }
 
         public bool HasUID()
@@ -72,24 +54,7 @@ namespace SurvivalEngine
 
         public void GenerateUID()
         {
-            SetUID(uid_prefix + GenerateUniqueID());
-        }
-
-        public void GenerateUIDEditor()
-        {
-            unique_id = uid_prefix + GenerateUniqueID(); //Dont save to dict in editor mode
-        }
-
-        public string GetSubUID(string sub_tag)
-        {
-            if (sub_dict.ContainsKey(sub_tag))
-                return sub_dict[sub_tag]; //Dict prevents GC alloc
-            if (string.IsNullOrEmpty(unique_id))
-                return ""; //No UID
-
-            string sub_uid = unique_id + "_" + sub_tag;
-            sub_dict[sub_tag] = sub_uid;
-            return sub_uid;
+            unique_id = uid_prefix + GenerateUniqueID();
         }
 
         public static string GenerateUniqueID(int min=11, int max=17)

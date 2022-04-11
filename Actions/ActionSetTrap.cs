@@ -8,7 +8,7 @@ namespace SurvivalEngine
     /// ReActivate a trap that was previously triggered
     /// </summary>
     
-    [CreateAssetMenu(fileName = "Action", menuName = "SurvivalEngine/Actions/ActivateTrap", order = 50)]
+    [CreateAssetMenu(fileName = "Action", menuName = "Data/Actions/ActivateTrap", order = 50)]
     public class ActionSetTrap : SAction
     {
         public override void DoAction(PlayerCharacter character, Selectable select)

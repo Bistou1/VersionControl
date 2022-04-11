@@ -11,7 +11,7 @@ namespace SurvivalEngine
     /// This avoid having to reference the new item to each tree everytime you create a new type of axe. You could just add the new axe to the group that is already attached to every exisitng tree.
     /// </summary>
 
-    [CreateAssetMenu(fileName = "GroupData", menuName = "SurvivalEngine/GroupData", order = 1)]
+    [CreateAssetMenu(fileName = "GroupData", menuName = "Data/GroupData", order = 1)]
     public class GroupData : ScriptableObject
     {
         public string group_id;

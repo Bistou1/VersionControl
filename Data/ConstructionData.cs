@@ -8,7 +8,7 @@ namespace SurvivalEngine
     /// Data file for Constructions
     /// </summary>
 
-    [CreateAssetMenu(fileName = "ConstructionData", menuName = "SurvivalEngine/ConstructionData", order = 4)]
+    [CreateAssetMenu(fileName = "ConstructionData", menuName = "Data/ConstructionData", order = 4)]
     public class ConstructionData : CraftData
     {
         [Header("--- ConstructionData ------------------")]
@@ -29,10 +29,10 @@ namespace SurvivalEngine
             return durability_type != DurabilityType.None && durability >= 0.1f;
         }
 
-        public static new void Load()
+        public static void Load(string constructions_folder)
         {
             construction_data.Clear();
-            construction_data.AddRange(Resources.LoadAll<ConstructionData>(""));
+            construction_data.AddRange(Resources.LoadAll<ConstructionData>(constructions_folder));
         }
 
         public new static ConstructionData Get(string construction_id)

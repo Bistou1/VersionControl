@@ -8,26 +8,25 @@ namespace SurvivalEngine
     /// Use to equip/unequip equipment items
     /// </summary>
     
-    [CreateAssetMenu(fileName = "Action", menuName = "SurvivalEngine/Actions/Equip", order = 50)]
+    [CreateAssetMenu(fileName = "Action", menuName = "Data/Actions/Equip", order = 50)]
     public class ActionEquip : SAction
     {
 
         public override void DoAction(PlayerCharacter character, ItemSlot slot)
         {
             ItemData item = slot.GetItem();
-            InventoryData inventory = slot.GetInventory();
-
             if (item != null && item.type == ItemType.Equipment)
             {
-                if (inventory.type == InventoryType.Equipment && slot is EquipSlotUI)
+                if (slot.is_equip)
                 {
-                    EquipSlotUI eslot = (EquipSlotUI) slot;
-                    character.Inventory.UnequipItem(eslot.equip_slot);
+                    character.UnEquipItem(item, slot.index);
                 }
                 else
                 {
-                    character.Inventory.EquipItem(inventory, slot.index);
+                    character.EquipItem(item, slot.index);
                 }
+
+                TheUI.Get().CancelSelection();
             }
         }
 

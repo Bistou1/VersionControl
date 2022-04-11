@@ -4,16 +4,11 @@ using UnityEngine;
 
 namespace SurvivalEngine
 {
-    /// <summary>
-    /// Crafting cost
-    /// </summary>
 
     [System.Serializable]
     public class CraftCostData
     {
         public Dictionary<ItemData, int> craft_items = new Dictionary<ItemData, int>();
-        public Dictionary<GroupData, int> craft_fillers = new Dictionary<GroupData, int>();
-        public Dictionary<CraftData, int> craft_requirements = new Dictionary<CraftData, int>();
         public GroupData craft_near;
     }
 
@@ -21,8 +16,11 @@ namespace SurvivalEngine
     /// Parent data class for craftable items (items, constructions, plants)
     /// </summary>
 
-    public class CraftData : IdData
+    public class CraftData : ScriptableObject
     {
+        [Header("--- CraftData ------------------")]
+        public string id;
+
         [Header("Display")]
         public string title;
         public Sprite icon;
@@ -35,19 +33,14 @@ namespace SurvivalEngine
         [Header("Crafting")]
         public bool craftable; //Can be crafted? If false, can still be learn through the learn action
         public int craft_quantity = 1; //Does it craft more than 1?
-        public float craft_duration = 0f; //How long to craft
-        public int craft_sort_order = 0; //Which items appear first in crafting menu
-
-        [Header("Crafting Cost")]
         public GroupData craft_near; //Group of selectable required near the player to craft this (ex: fire source, water source)
         public ItemData[] craft_items; //Items needed to craft this
-        public GroupData[] craft_fillers; //Items needed to craft this (but that can be any item in group)
-        public CraftData[] craft_requirements; //What needs to be built before you can craft this
+        public int craft_sort_order = 0; //Which items appear first in crafting menu
 
         [Header("FX")]
         public AudioClip craft_sound;
 
-        protected static List<CraftData> craft_data = new List<CraftData>();
+        private static List<CraftData> craft_data = new List<CraftData>();
 
         public bool HasGroup(GroupData group)
         {
@@ -112,22 +105,6 @@ namespace SurvivalEngine
                     cost.craft_items[item] += 1;
             }
 
-            foreach (GroupData group in craft_fillers)
-            {
-                if (!cost.craft_fillers.ContainsKey(group))
-                    cost.craft_fillers[group] = 1;
-                else
-                    cost.craft_fillers[group] += 1;
-            }
-
-            foreach (CraftData cdata in craft_requirements)
-            {
-                if (!cost.craft_requirements.ContainsKey(cdata))
-                    cost.craft_requirements[cdata] = 1;
-                else
-                    cost.craft_requirements[cdata] += 1;
-            }
-
             if (craft_near != null)
                 cost.craft_near = craft_near;
 
@@ -137,7 +114,9 @@ namespace SurvivalEngine
         public static void Load()
         {
             craft_data.Clear();
-            craft_data.AddRange(Resources.LoadAll<CraftData>(""));
+            craft_data.AddRange(ItemData.GetAll());
+            craft_data.AddRange(ConstructionData.GetAll());
+            craft_data.AddRange(PlantData.GetAll());
         }
 
         public static List<CraftData> GetAllInGroup(GroupData group)
@@ -151,14 +130,14 @@ namespace SurvivalEngine
             return olist;
         }
 
-        public static List<CraftData> GetAllCraftableInGroup(PlayerCharacter character, GroupData group)
+        public static List<CraftData> GetAllCraftableInGroup(GroupData group)
         {
             List<CraftData> olist = new List<CraftData>();
             foreach (CraftData item in craft_data)
             {
                 if (item.craft_quantity > 0 && item.HasGroup(group))
                 {
-                    bool learnt = item.craftable || character.Data.IsIDUnlocked(item.id);
+                    bool learnt = item.craftable || PlayerData.Get().IsIDUnlocked(item.id);
                     if(learnt)
                         olist.Add(item);
                 }
@@ -180,30 +159,6 @@ namespace SurvivalEngine
         {
             return craft_data;
         }
-
-        //Count objects of type in scene
-        public static int CountSceneObjects(CraftData data)
-        {
-            return Craftable.CountSceneObjects(data); //All objects in scene
-        }
-
-        public static int CountSceneObjects(CraftData data, Vector3 pos, float range)
-        {
-            return Craftable.CountSceneObjects(data, pos, range);
-        }
-
-        //Compability with older version
-        public static int CountObjectInRadius(CraftData data, Vector3 pos, float radius) { return CountSceneObjects(data, pos, radius); }
-
-        //Return all scenes objects with this data
-        public static List<GameObject> GetAllObjectsOf(CraftData data)
-        {
-            return Craftable.GetAllObjectsOf(data);
-        }
-
-        public static GameObject Create(CraftData data, Vector3 pos)
-        {
-            return Craftable.Create(data, pos);
-        }
     }
+
 }

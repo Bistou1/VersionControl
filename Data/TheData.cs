@@ -12,34 +12,27 @@ namespace SurvivalEngine
     public class TheData : MonoBehaviour
     {
         public GameData data;
-        public AssetData assets;
+
+        [Header("Resources")]
+        public string items_folder = "Items";
+        public string constructions_folder = "Constructions";
+        public string plants_folder = "Plants";
+        public string characters_folder = "Characters";
 
         private static TheData _instance;
 
         void Awake()
         {
             _instance = this;
-
+            ItemData.Load(items_folder);
+            ConstructionData.Load(constructions_folder);
+            PlantData.Load(plants_folder);
+            CharacterData.Load(characters_folder);
             CraftData.Load();
-            ItemData.Load();
-            ConstructionData.Load();
-            PlantData.Load();
-            CharacterData.Load();
-            SpawnData.Load();
-            
-            //Load managers
-            if (!FindObjectOfType<TheUI>())
-                Instantiate(TheGame.IsMobile() ? assets.ui_canvas_mobile : assets.ui_canvas);
-            if (!FindObjectOfType<TheAudio>())
-                Instantiate(assets.audio_manager);
-            if (!FindObjectOfType<ActionSelector>())
-                Instantiate(assets.action_selector);
         }
 
         public static TheData Get()
         {
-            if (_instance == null)
-                _instance = FindObjectOfType<TheData>();
             return _instance;
         }
     }

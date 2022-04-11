@@ -9,14 +9,18 @@ namespace SurvivalEngine
     /// </summary>
     
 
-    [CreateAssetMenu(fileName = "Action", menuName = "SurvivalEngine/Actions/Eat", order = 50)]
+    [CreateAssetMenu(fileName = "Action", menuName = "Data/Actions/Eat", order = 50)]
     public class ActionEat : SAction
     {
 
         public override void DoAction(PlayerCharacter character, ItemSlot slot)
         {
-            InventoryData inventory = slot.GetInventory();
-            character.Inventory.EatItem(inventory, slot.index);
+            ItemData item = slot.GetItem();
+            if (item != null)
+            {
+                character.EatItem(item, slot.index);
+            }
+
         }
 
         public override bool CanDoAction(PlayerCharacter character, ItemSlot slot)

@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
@@ -6,111 +6,100 @@ using UnityEngine;
 
 namespace SurvivalEngine
 {
+
     /// <summary>
-    /// Script to write a class to the disk, or to read a file containing class from the disk
+    /// Script to write PlayerData to the disk, or to read a file containing PlayerData from the disk
     /// </summary>
 
     [System.Serializable]
     public class SaveSystem
     {
-        private const string last_save_id = "last_save_survival";
-        private const string extension = ".survival";
+        private static string loaded = "";
+        private static bool saving = false;
 
-        //Load any file to a class, make sure the class is marked with [System.Serializable]
-        public static T LoadFile<T>(string filename) where T : class
+        public static PlayerData saved_data = null;
+
+        private static void LoadData(string filename)
         {
-            T data = null;
-            string fullpath = Application.persistentDataPath + "/" + filename + extension;
-            if (IsValidFilename(filename) && File.Exists(fullpath))
+            if (loaded != filename && File.Exists(Application.persistentDataPath + "/" + filename + ".data"))
             {
-                FileStream file = null;
                 try
                 {
                     BinaryFormatter bf = new BinaryFormatter();
-                    file = File.Open(fullpath, FileMode.Open);
-                    data = (T)bf.Deserialize(file);
+                    FileStream file = File.Open(Application.persistentDataPath + "/" + filename + ".data", FileMode.Open);
+                    saved_data = (PlayerData)bf.Deserialize(file);
                     file.Close();
                 }
-                catch (System.Exception e) { Debug.Log("Error Loading Data " + e); if (file != null) file.Close(); }
+                catch (System.Exception e) { Debug.Log("Error Loading Data " + e); }
             }
-            return data;
+            loaded = filename;
         }
 
-        //Save any class to a file, make sure the class is marked with [System.Serializable]
-        public static void SaveFile<T>(string filename, T data) where T : class
+        private static void SaveData(string filename)
         {
-            if (IsValidFilename(filename))
+
+            if (IsLoaded() && loaded == filename)
             {
-                FileStream file = null;
+                saving = true;
                 try
                 {
                     BinaryFormatter bf = new BinaryFormatter();
-                    string fullpath = Application.persistentDataPath + "/" + filename + extension;
-                    file = File.Create(fullpath);
-                    bf.Serialize(file, data);
+                    FileStream file = File.Create(Application.persistentDataPath + "/" + filename + ".data");
+                    bf.Serialize(file, saved_data);
                     file.Close();
                 }
-                catch (System.Exception e) { Debug.Log("Error Saving Data " + e); if (file != null) file.Close(); }
+                catch (System.Exception e) { Debug.Log("Error Saving Data " + e); }
+                saving = false;
             }
         }
 
-        public static void DeleteFile(string filename)
+        public static PlayerData Load(string filename)
         {
-            string fullpath = Application.persistentDataPath + "/" + filename + extension;
-            if (File.Exists(fullpath))
-                File.Delete(fullpath);
+            LoadData(filename);
+            if (saved_data == null)
+                saved_data = new PlayerData(filename);
+            return saved_data;
         }
 
-        public static void SetLastSave(string filename)
+        public static void Save(string filename, PlayerData player)
         {
-            if (IsValidFilename(filename))
+            LoadData(filename);
+            saved_data = player;
+            SaveData(filename);
+            PlayerPrefs.SetString("last_save", filename);
+        }
+
+        public static void Unload()
+        {
+            loaded = null;
+        }
+
+        public static void Delete(string filename)
+        {
+            if (loaded == filename)
             {
-                PlayerPrefs.SetString(last_save_id, filename);
+                loaded = null;
+                saved_data = null;
             }
+
+            string path = (Application.persistentDataPath + "/" + filename + ".data");
+            if (File.Exists(path))
+                File.Delete(path);
         }
 
         public static string GetLastSave()
         {
-            return PlayerPrefs.GetString(last_save_id, "");
+            return PlayerPrefs.GetString("last_save", "");
         }
 
-        //Return all save files
-        public static List<string> GetAllSave()
+        public static bool IsLoaded()
         {
-            List<string> saves = new List<string>();
-            string[] files = Directory.GetFiles(Application.persistentDataPath);
-            foreach (string file in files)
-            {
-                if (file.EndsWith(extension))
-                {
-                    string filename = Path.GetFileName(file).Split('.')[0];
-                    if (!saves.Contains(filename))
-                        saves.Add(filename);
-                }
-            }
-            return saves;
+            return saved_data != null && !string.IsNullOrEmpty(loaded);
         }
 
-        public static bool DoesFileExist(string filename)
+        public static bool IsSaving()
         {
-            string fullpath = Application.persistentDataPath + "/" + filename + extension;
-            return IsValidFilename(filename) && File.Exists(fullpath);
-        }
-
-        public static bool IsValidFilename(string filename)
-        {
-            if (string.IsNullOrWhiteSpace(filename))
-                return false; //Filename cant be blank
-
-            if (filename.Contains("."))
-                return false; //Dont allow dot as they are for extensions savefile
-
-            foreach (char c in Path.GetInvalidFileNameChars())
-            {
-                if (filename.Contains(c.ToString()))
-                    return false; //Dont allow any special characters
-            }
-            return true;
+            return saving;
         }
     }
 

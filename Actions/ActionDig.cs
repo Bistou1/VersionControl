@@ -8,7 +8,7 @@ namespace SurvivalEngine
     /// Dig using the shovel, to remove plants or to dig burried things
     /// </summary>
 
-    [CreateAssetMenu(fileName = "Action", menuName = "SurvivalEngine/Actions/Dig", order = 50)]
+    [CreateAssetMenu(fileName = "Action", menuName = "Data/Actions/Dig", order = 50)]
     public class ActionDig : SAction
     {
         public float dig_range = 2f;
@@ -22,16 +22,15 @@ namespace SurvivalEngine
             if (spot != null)
                 pos = spot.transform.position;
 
-            string animation = character.Animation ? character.Animation.dig_anim : "";
-            character.TriggerAnim(animation, pos);
-            character.TriggerProgressAction(1.5f, () =>
+            string animation = PlayerCharacterAnim.Get() ? PlayerCharacterAnim.Get().dig_anim : "";
+            character.TriggerAction(animation, pos, 1.5f, () =>
             {
                 if (spot != null)
                     spot.Dig();
                 else if (plant != null)
                     plant.Kill();
 
-                InventoryItemData ivdata = character.EquipData.GetItem(slot.index);
+                InventoryItemData ivdata = PlayerData.Get().GetEquippedItemSlot(slot.index);
                 if (ivdata != null)
                     ivdata.durability -= 1;
             });
@@ -39,7 +38,7 @@ namespace SurvivalEngine
 
         public override bool CanDoAction(PlayerCharacter character, ItemSlot slot)
         {
-            return slot is EquipSlotUI;
+            return slot.type == ItemSlotType.Equipment;
         }
     }
 

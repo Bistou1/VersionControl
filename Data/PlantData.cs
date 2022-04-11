@@ -8,7 +8,7 @@ namespace SurvivalEngine
     /// Data file for plants
     /// </summary>
 
-    [CreateAssetMenu(fileName = "PlantData", menuName = "SurvivalEngine/PlantData", order = 5)]
+    [CreateAssetMenu(fileName = "PlantData", menuName = "Data/PlantData", order = 5)]
     public class PlantData : CraftData
     {
         [Header("--- PlantData ------------------")]
@@ -26,10 +26,10 @@ namespace SurvivalEngine
             return plant_prefab;
         }
 
-        public static new void Load()
+        public static void Load(string plant_folder)
         {
             plant_data.Clear();
-            plant_data.AddRange(Resources.LoadAll<PlantData>(""));
+            plant_data.AddRange(Resources.LoadAll<PlantData>(plant_folder));
         }
 
         public new static PlantData Get(string construction_id)

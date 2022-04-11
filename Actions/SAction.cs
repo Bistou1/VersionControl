@@ -9,7 +9,7 @@ namespace SurvivalEngine
     /// Selectable Action parent class: Any action selected manually through the Action Selector (Items or Selectables)
     /// </summary>
 
-    public abstract class SAction : ScriptableObject
+    public class SAction : ScriptableObject
     {
         public string title;
 
@@ -37,8 +37,6 @@ namespace SurvivalEngine
             return true; //No condition
         }
 
-        public bool IsAuto() { return (this is AAction); }
-        public bool IsMerge() { return (this is MAction); }
     }
 
 }

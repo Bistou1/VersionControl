@@ -14,13 +14,6 @@ namespace SurvivalEngine
 
     }
 
-    public enum WeaponType
-    {
-        None=0,
-        WeaponMelee= 10,
-        WeaponRanged=20,
-    }
-
     public enum DurabilityType
     {
         None = 0,
@@ -36,14 +29,13 @@ namespace SurvivalEngine
         Head = 20,
         Body = 30,
         Feet = 40,
-        Backpack = 50,
-        Accessory = 60,
-        Shield = 70,
 
         //Generic slot for other parts, rename them to your own
+        Slot5 = 50,
+        Slot6 = 60,
+        Slot7 = 70,
         Slot8 = 80,
         Slot9 = 90,
-        Slot10 = 100,
     }
 
     public enum EquipSide
@@ -57,7 +49,7 @@ namespace SurvivalEngine
     /// Data file for Items
     /// </summary>
 
-    [CreateAssetMenu(fileName = "ItemData", menuName = "SurvivalEngine/ItemData", order = 2)]
+    [CreateAssetMenu(fileName = "ItemData", menuName = "Data/ItemData", order = 2)]
     public class ItemData : CraftData
     {
         [Header("--- ItemData ------------------")]
@@ -72,15 +64,13 @@ namespace SurvivalEngine
         public EquipSlot equip_slot;
         public EquipSide equip_side;
         public int armor = 0;
-        public int bag_size = 0;
         public BonusEffectData[] equip_bonus;
 
         [Header("Stats Equip Weapon")]
-        public WeaponType weapon_type;
+        public bool weapon;
+        public bool ranged;
         public int damage = 0;
         public float range = 1f;
-        public float attack_anim_speed = 1f; //Will multiply the animation/windup/windout by this value
-        public float attack_cooldown = 1f; //Seconds of waiting in between each attack
         public int strike_per_attack = 0; //Minimum is 1, if set to 3, each attack will hit 3 times, or shoot 3 projectiles
         public float strike_interval = 0f; //Interval in seconds between each strike of a single attack
 
@@ -95,15 +85,10 @@ namespace SurvivalEngine
         [Header("Action")]
         public SAction[] actions;
 
-        [Header("Shop")]
-        public int buy_cost = 0;
-        public int sell_cost = 0;
-
         [Header("Ref Data")]
         public ItemData container_data;
         public PlantData plant_data;
         public ConstructionData construction_data;
-        public CharacterData character_data;
         public GroupData projectile_group;
 
         [Header("Prefab")]
@@ -141,27 +126,13 @@ namespace SurvivalEngine
 
             foreach (SAction action in actions)
             {
-                if (action != null && action is MAction)
+                if (action is MAction)
                 {
                     MAction maction = (MAction)action;
                     if (other.HasGroup(maction.merge_target))
                     {
                         return maction;
                     }
-                }
-            }
-            return null;
-        }
-
-        public AAction FindAutoAction(PlayerCharacter character, ItemSlot islot)
-        {
-            foreach (SAction action in actions)
-            {
-                if (action != null && action is AAction)
-                {
-                    AAction aaction = (AAction)action;
-                    if (aaction.CanDoAction(character, islot))
-                        return aaction;
                 }
             }
             return null;
@@ -174,22 +145,12 @@ namespace SurvivalEngine
 
         public bool CanBeBuilt()
         {
-            return construction_data != null || character_data != null || plant_data != null;
+            return construction_data != null;
         }
 
-        public bool IsWeapon()
+        public bool CanBeSowed()
         {
-            return type == ItemType.Equipment && weapon_type != WeaponType.None;
-        }
-
-        public bool IsMeleeWeapon()
-        {
-            return type == ItemType.Equipment && weapon_type == WeaponType.WeaponMelee;
-        }
-
-        public bool IsRangedWeapon()
-        {
-            return type == ItemType.Equipment && weapon_type == WeaponType.WeaponRanged;
+            return plant_data != null;
         }
 
         public bool HasDurability()
@@ -200,18 +161,19 @@ namespace SurvivalEngine
         //From 0 to 100
         public int GetDurabilityPercent(float current_durability)
         {
-            float perc = durability > 0.01f ? Mathf.Clamp01(current_durability / durability) : 0f;
+            float perc = Mathf.Clamp01(current_durability / durability);
             return Mathf.RoundToInt(perc * 100f);
         }
 
-        public static new void Load()
+        public static void Load(string items_folder)
         {
             item_data.Clear();
             item_dict.Clear();
-            item_data.AddRange(Resources.LoadAll<ItemData>(""));
-
+            item_data.AddRange(Resources.LoadAll<ItemData>(items_folder));
             foreach (ItemData item in item_data)
+            {
                 item_dict.Add(item.id, item);
+            }
         }
 
         public new static ItemData Get(string item_id)
@@ -225,12 +187,32 @@ namespace SurvivalEngine
         {
             return item_data;
         }
+
+        public static int GetEquipIndex(EquipSlot slot)
+        {
+            if (slot == EquipSlot.Hand)
+                return 0;
+            if (slot == EquipSlot.Head)
+                return 1;
+            if (slot == EquipSlot.Body)
+                return 2;
+            if (slot == EquipSlot.Feet)
+                return 3;
+            return -1;
+        }
+
+        public static EquipSlot GetEquipType(int index)
+        {
+            if (index == 0)
+                return EquipSlot.Hand;
+            if (index == 1)
+                return EquipSlot.Head;
+            if (index == 2)
+                return EquipSlot.Body;
+            if (index == 3)
+                return EquipSlot.Feet;
+            return EquipSlot.None;
+        }
     }
 
-    [System.Serializable]
-    public struct ItemDataValue
-    {
-        public ItemData item;
-        public int quantity;
-    }
 }

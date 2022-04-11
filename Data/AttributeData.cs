@@ -10,11 +10,9 @@ namespace SurvivalEngine
     {
         None = 0,
         Health = 2,
-        Energy = 3,
         Happiness = 4,
         Hunger = 6,
         Thirst = 8,
-        Heat=10,
 
         //Generic attributes, rename them to your own 
         Attribute5 = 50,
@@ -28,7 +26,7 @@ namespace SurvivalEngine
     /// Attribute data (health, hunger, thirst, etc)
     /// </summary>
 
-    [CreateAssetMenu(fileName = "AttributeData", menuName = "SurvivalEngine/AttributeData", order = 11)]
+    [CreateAssetMenu(fileName = "AttributeData", menuName = "Data/AttributeData", order = 11)]
     public class AttributeData : ScriptableObject
     {
         public AttributeType type;
@@ -44,7 +42,6 @@ namespace SurvivalEngine
         [Header("When reaches zero")]
         public float deplete_hp_loss = -100f; //Per hour
         public float deplete_move_mult = 1f; //1f = normal speed
-        public float deplete_attack_mult = 1f; //1f = normal speed
 
 
     }

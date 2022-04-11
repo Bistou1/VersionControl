@@ -8,7 +8,7 @@ namespace SurvivalEngine
     /// Sleeeep!
     /// </summary>
 
-    [CreateAssetMenu(fileName = "Action", menuName = "SurvivalEngine/Actions/Sleep", order = 50)]
+    [CreateAssetMenu(fileName = "Action", menuName = "Data/Actions/Sleep", order = 50)]
     public class ActionSleep : SAction
     {
         public float sleep_hp_hour; //In game hours
